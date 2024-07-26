@@ -1,0 +1,19 @@
+# Directory dei dati di Docker
+backend/db_data/
+
+# File di configurazione sensibili
+backend/.env
+
+# Log di Docker
+backend/*.log
+
+# File temporanei
+backend/*.tmp
+backend/*.swp
+
+# Backup
+backend/*~ 
+backend/*.bak
+
+# IDE specifici
+backend/.vscode/
