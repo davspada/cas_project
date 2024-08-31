@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   cas-db:
     image: postgis/postgis:latest
@@ -9,17 +11,29 @@ services:
       - POSTGRES_USER=cas
       - POSTGRES_PASSWORD=pw
       - POSTGRES_DB=cas_db
+    networks:
+      - cas-network
   
-    pgadmin:
-      image: dpage/pgadmin4:latest
-      ports:
-        - 5050:80
-      environment:
-        - PGADMIN_DEFAULT_EMAIL=admin@example.com
-        - PGADMIN_DEFAULT_PASSWORD=admin
-      depends_on:
-        - cas-db
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - 5050:80
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    depends_on:
+      - cas-db
+    networks:
+      - cas-network
 
-volumes:
-  db_data:
-    external: true
+  express-app:
+    image: cas_express
+    ports:
+      - 3001:3001
+    depends_on:
+      - cas-db
+    networks:
+      - cas-network
+
+networks:
+  cas-network:
