@@ -5,6 +5,7 @@ import 'ol/ol.css';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
+import { fromLonLat } from 'ol/proj';
 
 const MapComponent = () => {
   const mapRef = useRef(null);
@@ -19,8 +20,8 @@ const MapComponent = () => {
           }),
         ],
         view: new View({
-          center: [0, 0],
-          zoom: 2,
+          center: fromLonLat([11.3394883, 44.4938134]),
+          zoom: 15,
         }),
       });
 
@@ -29,7 +30,7 @@ const MapComponent = () => {
     }
   }, []);
 
-  return <div ref={mapRef} style={{ width: '100%', height: '400px' }} />;
+  return <div ref={mapRef} style={{ width: '100%', height: '1000px' }} />;
 };
 
 export default MapComponent;
