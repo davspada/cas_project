@@ -1,6 +1,6 @@
-// pages/index.js
+  // pages/index.js
 import Head from 'next/head';
-import MapComponent from './MapComponent';
+import MapComponent from './dashboard';
 
 export default function Home() {
   return (
