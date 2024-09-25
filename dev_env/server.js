@@ -21,7 +21,8 @@ app.get('/api/users', async (req, res) => {
     const result = await client.query(`
       SELECT 
         id, 
-        ST_AsGeoJSON(location) as location 
+        ST_AsGeoJSON(location) as location,
+        transportation_mode
       FROM users;
     `);
 
@@ -30,7 +31,7 @@ app.get('/api/users', async (req, res) => {
       features: result.rows.map(row => ({
         type: "Feature",
         geometry: JSON.parse(row.location),
-        properties: { id: row.id },
+        properties: { id: row.id , transportation_mode: row.transportation_mode },
       })),
     };
 

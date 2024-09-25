@@ -1,5 +1,3 @@
-// components/MapContainer.tsx
-
 "use client"; // Enables client-side rendering
 import React, { useEffect, useRef } from 'react';
 import 'ol/ol.css';
@@ -11,76 +9,90 @@ import VectorSource from 'ol/source/Vector';
 import { Point } from 'ol/geom';
 import { Feature } from 'ol';
 import { fromLonLat } from 'ol/proj';
-import { Style, Icon, Text, Fill, Stroke } from 'ol/style';
+import { Style, Text, Fill, Stroke } from 'ol/style';
 
 interface MapContainerProps {
   userPositions: Array<any>; // Adjust according to the structure of your data
-  mobilityFilter: string;
+  mobilityFilter: string;    // 'walking', 'car', or 'all'
 }
 
 const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilter }) => {
   const mapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    console.log(userPositions);
+    console.log(mobilityFilter);
     if (mapRef.current) {
+      // Create the base map layer
+      const baseMap = new TileLayer({
+        source: new OSM(),
+      });
+
       const map = new Map({
         target: mapRef.current,
-        layers: [
-          new TileLayer({
-            source: new OSM(),
-          }),
-        ],
+        layers: [baseMap], // Only the base layer initially
         view: new View({
           center: fromLonLat([11.3394883, 44.4938134]), // Center on Bologna
           zoom: 15,
         }),
       });
 
-      // Function to filter user positions based on mobility
-      const filterUserPositions = (positions: Array<any>, filter: string) => {
-        if (filter === 'all') return positions; // No filter
-        return positions.filter(pos => pos.properties.mobility === filter); // Assuming `mobility` property
+      // Define a function to create style for the user points
+      const getUserStyle = (mobility: string) => {
+        return new Style({
+          text: new Text({
+            text: mobility === 'walking' ? '🚶‍♂️' : '🚗', // Using emojis for simplicity
+            scale: 2,
+            fill: new Fill({ color: '#000' }),
+            stroke: new Stroke({ color: '#fff', width: 2 }),
+          }),
+        });
       };
 
-      // Create a vector source and add filtered user features
-      const vectorSource = new VectorSource({
-        features: filterUserPositions(userPositions, mobilityFilter).map((feature) => {
-          const [lon, lat] = feature.geometry.coordinates;
-
-          const pointFeature = new Feature({
-            geometry: new Point(fromLonLat([lon, lat])),
-            id: feature.properties.id,
+      // Function to create features based on user positions and mobility type
+      const createFeatures = (positions: Array<any>, mobility: string) => {
+        return positions
+          .filter(pos => pos.properties.transportation_mode === mobility) // Use the correct property name
+          .map((feature) => {
+            const [lon, lat] = feature.geometry.coordinates;
+            const pointFeature = new Feature({
+              geometry: new Point(fromLonLat([lon, lat])),
+              id: feature.properties.id,
+            });
+            pointFeature.setStyle(getUserStyle(feature.properties.transportation_mode));
+            return pointFeature;
           });
+      };
 
-          // Set the style for the feature (icon marker and coordinates text)
-          pointFeature.setStyle(new Style({
-            image: new Icon({
-              src: 'https://openlayers.org/en/v4.6.5/examples/data/icon.png', // Standard marker icon
-              scale: 0.05, // Adjust scale as needed
-            }),
-            text: new Text({
-              text: `${lon.toFixed(4)}, ${lat.toFixed(4)}`, // Display coordinates
-              offsetY: -25, // Offset text above the marker
-              fill: new Fill({ color: '#000' }),
-              stroke: new Stroke({ color: '#fff', width: 2 }),
-            }),
-          }));
-
-          return pointFeature;
-        }),
+      // Create separate vector layers for walking and car users
+      const walkingUsersSource = new VectorSource({
+        features: createFeatures(userPositions, 'walking'),
       });
 
-      // Create and add the vector layer
-      const vectorLayer = new VectorLayer({
-        source: vectorSource,
+      const carUsersSource = new VectorSource({
+        features: createFeatures(userPositions, 'car'),
       });
 
-      map.addLayer(vectorLayer);
+      const walkingLayer = new VectorLayer({
+        source: walkingUsersSource,
+        visible: mobilityFilter === 'walking' || mobilityFilter === 'all', // Visible if filter is 'walking' or 'all'
+      });
 
-      // Clean up when component unmounts
-      return () => map.setTarget(undefined);
+      const carLayer = new VectorLayer({
+        source: carUsersSource,
+        visible: mobilityFilter === 'car' || mobilityFilter === 'all', // Visible if filter is 'car' or 'all'
+      });
+
+      // Add layers to the map
+      map.addLayer(walkingLayer);
+      map.addLayer(carLayer);
+
+      // Clean up on component unmount
+      return () => {
+        map.setTarget(undefined);
+      };
     }
-  }, [userPositions, mobilityFilter]); // Re-run when userPositions or mobilityFilter changes
+  }, [userPositions, mobilityFilter]); // Re-run effect when userPositions or mobilityFilter changes
 
   return <div ref={mapRef} style={{ width: '100%', height: '1000px' }} />;
 };

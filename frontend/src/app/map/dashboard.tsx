@@ -1,4 +1,3 @@
-// pages/dashboard.tsx
 "use client"
 import { useState, useEffect } from 'react';
 import MapContainer from '@/components/MapContainer';
@@ -22,6 +21,7 @@ const Dashboard = () => {
     fetchUserPositions();
   }, []);
 
+  // Conditional rendering: Only show the map when userPositions has data
   return (
     <div>
       <h1>Municipality Dashboard</h1>
@@ -32,13 +32,16 @@ const Dashboard = () => {
         <select value={mobilityFilter} onChange={(e) => setMobilityFilter(e.target.value)}>
           <option value="all">All</option>
           <option value="walking">Walking</option>
-          <option value="biking">Biking</option>
-          <option value="publicTransport">Public Transport</option>
+          <option value="car">Car</option>
         </select>
       </div>
 
-      {/* MapContainer with props */}
-      <MapContainer userPositions={userPositions} mobilityFilter={mobilityFilter} />
+      {/* Only render MapContainer when userPositions is not empty */}
+      {userPositions.length > 0 ? (
+        <MapContainer userPositions={userPositions} mobilityFilter={mobilityFilter} />
+      ) : (
+        <p>Loading map data...</p>
+      )}
     </div>
   );
 };
