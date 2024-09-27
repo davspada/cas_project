@@ -9,7 +9,7 @@ import VectorSource from 'ol/source/Vector';
 import { Point } from 'ol/geom';
 import { Feature } from 'ol';
 import { fromLonLat } from 'ol/proj';
-import { Style, Text, Fill, Stroke } from 'ol/style';
+import { Style, Text, Fill, Stroke, Icon } from 'ol/style';
 
 interface MapContainerProps {
   userPositions: Array<any>; // Adjust according to the structure of your data
@@ -20,8 +20,9 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const mapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    console.log(userPositions);
-    console.log(mobilityFilter);
+    //DEBUG
+    //console.log(userPositions);
+    //console.log(mobilityFilter);
     if (mapRef.current) {
       // Create the base map layer
       const baseMap = new TileLayer({
@@ -38,13 +39,19 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
       });
 
       // Define a function to create style for the user points
-      const getUserStyle = (mobility: string) => {
+      const getUserStyle = (mobility: string, id: string) => {
+        const iconSrc = mobility === 'walking' ? '/icons/walking-solid.png' : '/icons/car-solid.png';
         return new Style({
+          image: new Icon({
+          src: iconSrc,
+          scale: 1, // Adjust the scale as needed
+          }),
           text: new Text({
-            text: mobility === 'walking' ? '🚶‍♂️' : '🚗', // Using emojis for simplicity
-            scale: 2,
-            fill: new Fill({ color: '#000' }),
-            stroke: new Stroke({ color: '#fff', width: 2 }),
+        text: id,
+        scale: 1.5,
+        fill: new Fill({ color: '#000' }),
+        stroke: new Stroke({ color: '#fff', width: 2 }),
+        offsetY: 15, // Adjust the offset as needed
           }),
         });
       };
@@ -59,7 +66,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
               geometry: new Point(fromLonLat([lon, lat])),
               id: feature.properties.id,
             });
-            pointFeature.setStyle(getUserStyle(feature.properties.transportation_mode));
+            pointFeature.setStyle(getUserStyle(feature.properties.transportation_mode, feature.properties.id));
             return pointFeature;
           });
       };
