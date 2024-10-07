@@ -17,3 +17,6 @@ backend/*.bak
 
 # IDE specifici
 backend/.vscode/
+
+backend/target/
+backend/data/
