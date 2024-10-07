@@ -44,45 +44,72 @@ async fn main() -> Result<(), PgError> {
             if let Some(auth_message) = read.next().await {
                 match auth_message {
                     Ok(msg) if msg.is_text() => {
-                        let client_data: ClientData = serde_json::from_str(msg.to_text().unwrap()).unwrap();
-                        
-                        if let Ok(true) = validate_and_update_client(&db_client, &client_data).await {
-                            println!("Autenticazione e aggiornamento riusciti per il codice: {}", client_data.code);
+                        match serde_json::from_str::<ClientData>(msg.to_text().unwrap()) {
+                            Ok(client_data) => {
+                                // Modifica nel punto in cui si verifica se l'ID del client è già connesso
+                                if is_client_connected(&db_client, &client_data.code).await {
+                                    println!("Connessione rifiutata per il codice: {}. Già connesso.", client_data.code);
+                                    let close_frame = CloseFrame {
+                                        code: CloseCode::Normal,
+                                        reason: "Connessione già esistente".into(),
+                                    };
+                                    write.send(Message::Close(Some(close_frame))).await.unwrap();
+                                    return;
+                                }
+                                
+                                if let Ok(true) = validate_and_update_client(&db_client, &client_data).await {
+                                    println!("Autenticazione e aggiornamento riusciti per il codice: {}", client_data.code);
 
-                            // Inizio il ciclo principale per la gestione dei messaggi successivi
-                            while let Some(message) = read.next().await {
-                                match message {
-                                    Ok(msg) => match msg {
-                                        Message::Text(received_text) => {
-                                            let updated_data: ClientData = serde_json::from_str(&received_text).unwrap();
-                                            update_client_data(&db_client, &updated_data).await.unwrap();
-                                            write.send(Message::text(received_text)).await.unwrap();
+                                    // Inizio il ciclo principale per la gestione dei messaggi successivi
+                                    while let Some(message) = read.next().await {
+                                        match message {
+                                            Ok(msg) => match msg {
+                                                Message::Text(received_text) => {
+                                                    match serde_json::from_str::<ClientData>(&received_text) {
+                                                        Ok(updated_data) => {
+                                                            update_client_data(&db_client, &updated_data).await.unwrap();
+                                                            write.send(Message::text(received_text)).await.unwrap();
+                                                        }
+                                                        Err(e) => {
+                                                            println!("Errore nella deserializzazione dei dati aggiornati: {}", e);
+                                                        }
+                                                    }
+                                                }
+                                                Message::Close(_) => {
+                                                    println!("Il client ha chiuso la connessione.");
+                                                    disconnect_client(&db_client, &client_data.code).await.unwrap();
+                                                    break;
+                                                }
+                                                _ => {}
+                                            },
+                                            Err(WsError::ConnectionClosed) => {
+                                                println!("Il client si è disconnesso.");
+                                                disconnect_client(&db_client, &client_data.code).await.unwrap();
+                                                break;
+                                            }
+                                            Err(e) => {
+                                                println!("Errore: {}", e);
+                                                break;
+                                            }
                                         }
-                                        Message::Close(_) => {
-                                            println!("Il client ha chiuso la connessione.");
-                                            disconnect_client(&db_client, &client_data.code).await.unwrap();
-                                            break;
-                                        }
-                                        _ => {}
-                                    },
-                                    Err(WsError::ConnectionClosed) => {
-                                        println!("Il client si è disconnesso.");
-                                        disconnect_client(&db_client, &client_data.code).await.unwrap();
-                                        break;
                                     }
-                                    Err(e) => {
-                                        println!("Errore: {}", e);
-                                        break;
-                                    }
+                                } else {
+                                    println!("Autenticazione fallita per il codice: {}", client_data.code);
+                                    let close_frame = CloseFrame {
+                                        code: CloseCode::Normal,
+                                        reason: "Autenticazione fallita".into(),
+                                    };
+                                    write.send(Message::Close(Some(close_frame))).await.unwrap();
                                 }
                             }
-                        } else {
-                            println!("Autenticazione fallita per il codice: {}", client_data.code);
-                            let close_frame = CloseFrame {
-                                code: CloseCode::Normal,
-                                reason: "Autenticazione fallita".into(),
-                            };
-                            write.send(Message::Close(Some(close_frame))).await.unwrap();
+                            Err(e) => {
+                                println!("Errore nella deserializzazione dei dati del client: {}", e);
+                                let close_frame = CloseFrame {
+                                    code: CloseCode::Normal,
+                                    reason: "Dati del client non validi".into(),
+                                };
+                                write.send(Message::Close(Some(close_frame))).await.unwrap();
+                            }
                         }
                     }
                     _ => {
@@ -98,6 +125,17 @@ async fn main() -> Result<(), PgError> {
         });
     }
     Ok(())
+}
+
+// Funzione per verificare se l'ID del client è già connesso
+async fn is_client_connected(db_client: &tokio_postgres::Client, client_code: &str) -> bool {
+    let query = "SELECT connected FROM clients WHERE client_code = $1";
+    let result = db_client.query_one(query, &[&client_code]).await;
+
+    match result {
+        Ok(row) => row.get(0),
+        Err(_) => false,
+    }
 }
 
 // Funzione per validare e aggiornare o inserire il client nel DB
@@ -117,7 +155,6 @@ async fn validate_and_update_client(client: &tokio_postgres::Client, data: &Clie
         Ok(true)
     }
 }
-
 
 // Funzione per aggiornare i dati del client durante la connessione
 async fn update_client_data(client: &tokio_postgres::Client, data: &ClientData) -> Result<(), PgError> {
