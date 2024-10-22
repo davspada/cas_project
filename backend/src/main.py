@@ -1,105 +1,107 @@
 import asyncio
 import websockets
-import json
 import asyncpg
-import logging
-from dataclasses import dataclass
-from typing import Tuple
+import json
+import secrets
+from typing import Dict
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Database connection details
+DB_CONFIG = {
+    "host": "localhost",
+    "database": "mydb",
+    "user": "postgis",
+    "password": "password"
+}
 
-@dataclass
-class ClientData:
-    code: str
-    position: Tuple[float, float]  # latitude, longitude
-    transport_mode: str
+class WebSocketServer:
+    def __init__(self):
+        self.db_pool = None
+        self.connected_clients: Dict[str, websockets.WebSocketServerProtocol] = {}
 
-# Check if client is already connected
-async def is_client_connected(db_pool, client_code):
-    async with db_pool.acquire() as conn:
-        query = "SELECT connected FROM users WHERE code = $1"
-        result = await conn.fetchval(query, client_code)
-        return result if result is not None else False
+    async def connect_to_db(self):
+        self.db_pool = await asyncpg.create_pool(**DB_CONFIG)
 
-# Validate client data and update database values
-async def validate_and_update_client(db_pool, data):
-    async with db_pool.acquire() as conn:
-        query = "SELECT EXISTS(SELECT 1 FROM users WHERE code = $1)"
-        exists = await conn.fetchval(query, data.code)
+    async def handle_client(self, websocket, path):
+        try:
+            # Step 1: Receive unique code from client
+            message = await websocket.recv()
+            data = json.loads(message)
+            code = data.get('code')
+            client_token = data.get('token')
 
-        if exists:
-            update = "UPDATE users SET position = ST_SetSRID(ST_MakePoint($2, $3), 4326), transport_mode = $4, connected = true WHERE code = $1"
-            await conn.execute(update, data.code, data.position[0], data.position[1], data.transport_mode)
-        else:
-            insert = "INSERT INTO users (code, connected, position, transport_mode) VALUES ($1, true, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4)"
-            await conn.execute(insert, data.code, data.position[0], data.position[1], data.transport_mode)
-        return True
+            if not code:
+                await self.send_error(websocket, "No code provided")
+                return
 
-# Update client data in database
-async def update_client_data(db_pool, data):
-    async with db_pool.acquire() as conn:
-        query = "SELECT EXISTS(SELECT 1 FROM users WHERE code = $1 AND connected = true)"
-        exists = await conn.fetchval(query, data.code)
+            # Step 2: Check if code exists in database
+            async with self.db_pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT token FROM USERS WHERE code = $1", code)
+                
+                if row:
+                    db_token = row['token']
+                    if db_token != client_token:
+                        await self.send_error(websocket, "Invalid token")
+                        return
+                else:
+                    # Generate new token and add to database
+                    new_token = secrets.token_hex(16)
+                    await conn.execute("INSERT INTO USERS (code, token, connected) VALUES ($1, $2, false)", code, new_token)
+                    await websocket.send(json.dumps({"token": new_token}))
 
-        if exists:
-            update = "UPDATE users SET position = ST_SetSRID(ST_MakePoint($2, $3), 4326), transport_mode = $4 WHERE code = $1"
-            await conn.execute(update, data.code, data.position[0], data.position[1], data.transport_mode)
+                # Step 3: Update connected status
+                await conn.execute("UPDATE USERS SET connected = true WHERE code = $1", code)
+                await self.notify_all(f"User {code} connected")
 
-# When client disconnects, set connected to false
-async def disconnect_client(db_pool, code):
-    async with db_pool.acquire() as conn:
-        update = "UPDATE users SET connected = false WHERE code = $1"
-        await conn.execute(update, code)
-        logger.info(f"Client {code} disconnected.")
+            self.connected_clients[code] = websocket
 
-async def handle_websocket(websocket, path, db_pool):
-    try:
-        # Authentication and initial data reception
-        auth_message = await websocket.recv()
-        client_data = ClientData(**json.loads(auth_message))
-
-        if await is_client_connected(db_pool, client_data.code):
-            logger.warning(f"Connection refused for code: {client_data.code}. Already connected.")
-            await websocket.close(1000, "Connection already exists")
-            return
-
-        if await validate_and_update_client(db_pool, client_data):
-            # Main loop for handling subsequent messages
+            # Step 4: Wait for updates
             async for message in websocket:
-                try:
-                    updated_data = ClientData(**json.loads(message))
-                    await update_client_data(db_pool, updated_data)
-                    await websocket.send(message)
-                    logger.info(f"Authentication and update successful for code: {client_data.code}")
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Error in deserializing updated data: {e}")
+                data = json.loads(message)
+                if 'position' in data:
+                    await self.update_location(code, data['position'])
+                elif 'transport_method' in data:
+                    await self.update_transport_method(code, data['transport_method'])
 
-        else:
-            logger.warning(f"Authentication failed for code: {client_data.code}")
-            await websocket.close(1000, "Authentication failed")
+        except websockets.exceptions.ConnectionClosed:
+            pass
+        finally:
+            # Step 6: Handle disconnection
+            if code in self.connected_clients:
+                del self.connected_clients[code]
+                async with self.db_pool.acquire() as conn:
+                    await conn.execute("UPDATE USERS SET connected = false WHERE code = $1", code)
+                await self.notify_all(f"User {code} disconnected")
 
-    except Exception as e:
-        logger.error(f"Error: {e}")
-    finally:
-        if 'client_data' in locals():
-            await disconnect_client(db_pool, client_data.code)
+    async def update_location(self, code, position):
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("UPDATE USERS SET position = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE code = $3",
+                                   position['lon'], position['lat'], code)
+            await self.notify_all(f"User {code} updated position")
+        except Exception as e:
+            await self.send_error(self.connected_clients[code], f"Error updating position: {str(e)}")
 
-async def main():
-    db_pool = await asyncpg.create_pool(
-        host="localhost",
-        user="postgis",
-        password="password",
-        database="mydb"
-    )
+    async def update_transport_method(self, code, transport_method):
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute("UPDATE USERS SET transport_method = $1 WHERE code = $2", transport_method, code)
+            await self.notify_all(f"User {code} updated transport method")
+        except Exception as e:
+            await self.send_error(self.connected_clients[code], f"Error updating transport method: {str(e)}")
 
-    server = await websockets.serve(
-        lambda ws, path: handle_websocket(ws, path, db_pool),
-        "127.0.0.1",
-        8080
-    )
+    async def notify_all(self, message):
+        for client in self.connected_clients.values():
+            await client.send(json.dumps({"notification": message}))
 
-    await server.wait_closed()
+    async def send_error(self, websocket, error_message):
+        await websocket.send(json.dumps({"error": error_message}))
+
+    async def run(self, host, port):
+        await self.connect_to_db()
+        server = await websockets.serve(self.handle_client, host, port)
+        print(f"WebSocket server running on {host}:{port}")
+        await server.wait_closed()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    server = WebSocketServer()
+    asyncio.run(server.run("127.0.0.1", 8080))
