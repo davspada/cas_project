@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        input, button { margin: 5px 0; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Client Test</h1>
+    <div>
+        <input type="text" id="codeInput" placeholder="Enter your code">
+        <input type="text" id="tokenInput" placeholder="Enter your token (if you have one)">
+        <button onclick="connect()">Connect</button>
+    </div>
+    <div>
+        <input type="text" id="latInput" placeholder="Latitude">
+        <input type="text" id="lonInput" placeholder="Longitude">
+        <button onclick="updatePosition()">Update Position</button>
+    </div>
+    <div>
+        <input type="text" id="transportInput" placeholder="Transport Method">
+        <button onclick="updateTransportMethod()">Update Transport Method</button>
+    </div>
+    <div>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+    <h2>Messages:</h2>
+    <div id="messages"></div>
+
+    <script>
+        let socket;
+        let code;
+        let token;
+
+        function connect() {
+            code = document.getElementById('codeInput').value;
+            token = document.getElementById('tokenInput').value;
+            
+            socket = new WebSocket('ws://localhost:8765');
+
+            socket.onopen = function(e) {
+                addMessage('Connected to server');
+                socket.send(JSON.stringify({ code: code, token: token }));
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.token) {
+                    token = data.token;
+                    addMessage('Received new token: ' + token);
+                    document.getElementById('tokenInput').value = token;
+                } else if (data.notification) {
+                    addMessage('Notification: ' + data.notification);
+                } else if (data.error) {
+                    addMessage('Error: ' + data.error);
+                } else {
+                    addMessage('Received: ' + event.data);
+                }
+            };
+
+            socket.onclose = function(event) {
+                if (event.wasClean) {
+                    addMessage(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                } else {
+                    addMessage('Connection died');
+                }
+            };
+
+            socket.onerror = function(error) {
+                addMessage(`Error: ${error.message}`);
+            };
+        }
+
+        function updatePosition() {
+            const lat = document.getElementById('latInput').value;
+            const lon = document.getElementById('lonInput').value;
+            socket.send(JSON.stringify({ position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
+            addMessage(`Sent position update: lat=${lat}, lon=${lon}`);
+        }
+
+        function updateTransportMethod() {
+            const transportMethod = document.getElementById('transportInput').value;
+            socket.send(JSON.stringify({ transport_method: transportMethod }));
+            addMessage(`Sent transport method update: ${transportMethod}`);
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                addMessage('Disconnected from server');
+            }
+        }
+
+        function addMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += message + '<br>';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
