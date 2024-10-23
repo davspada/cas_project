@@ -3,129 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Test Client</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <title>WebSocket Client Test</title>
     <style>
-        #map { height: 400px; }
-        .control-panel { margin-top: 20px; }
-        .user-list, .alert-list { max-height: 200px; overflow-y: auto; }
-        .status { padding: 10px; margin: 10px 0; }
-        .status.connected { background-color: #dff0d8; }
-        .status.disconnected { background-color: #f2dede; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        input, button { margin: 5px 0; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; }
     </style>
 </head>
 <body>
-    <h1>WebSocket Test Client</h1>
-    
-    <div id="connectionStatus" class="status disconnected">Disconnected</div>
-    
-    <div id="map"></div>
-    
-    <div class="control-panel">
-        <h2>Controls</h2>
-        <button onclick="connectWebSocket()">Connect WebSocket</button>
-        <button onclick="disconnectWebSocket()">Disconnect WebSocket</button>
-        <button onclick="getUsers()">Get Users</button>
-        <button onclick="getAlerts()">Get Alerts</button>
-        <button onclick="getGeofenceColors()">Get Geofence Colors</button>
-        <button onclick="clusterUsers()">Cluster Users</button>
-        
-        <h3>Insert Alert</h3>
-        <textarea id="alertGeojson" rows="4" cols="50" placeholder="GeoJSON for alert geofence"></textarea><br>
-        <input type="text" id="alertDescription" placeholder="Alert description"><br>
-        <button onclick="insertAlert()">Insert Alert</button>
+    <h1>WebSocket Client Test</h1>
+    <div>
+        <input type="text" id="codeInput" placeholder="Enter your code">
+        <input type="text" id="tokenInput" placeholder="Enter your token (if you have one)">
+        <button onclick="connect()">Connect</button>
     </div>
-    
-    <div class="output-panel">
-        <h2>Output</h2>
-        <div id="output"></div>
-        
-        <h3>Users</h3>
-        <div class="user-list" id="userList"></div>
-        
-        <h3>Alerts</h3>
-        <div class="alert-list" id="alertList"></div>
+    <div>
+        <input type="text" id="latInput" placeholder="Latitude">
+        <input type="text" id="lonInput" placeholder="Longitude">
+        <button onclick="updatePosition()">Update Position</button>
     </div>
+    <div>
+        <input type="text" id="transportInput" placeholder="Transport Method">
+        <button onclick="updateTransportMethod()">Update Transport Method</button>
+    </div>
+    <div>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+    <h2>Messages:</h2>
+    <div id="messages"></div>
 
     <script>
         let socket;
-        let map;
-        let userMarkers = [];
-        let alertPolygons = [];
+        let code;
+        let token;
 
-        function initMap() {
-            map = L.map('map').setView([0, 0], 2);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-        }
-
-        function connectWebSocket() {
-            socket = new WebSocket('ws://localhost:8081');
+        function connect() {
+            code = document.getElementById('codeInput').value;
+            token = document.getElementById('tokenInput').value;
             
-            socket.onopen = function(event) {
-                log('WebSocket connection established');
-                updateConnectionStatus(true);
-                
-                // Send authentication message with the correct format
-                const authMessage = {
-                    code: 'testClient',
-                    action: 'auth',
-                    payload: null
-                };
-                socket.send(JSON.stringify(authMessage));
+            socket = new WebSocket('ws://localhost:8080');
+
+            socket.onopen = function(e) {
+                addMessage('Connected to server');
+                socket.send(JSON.stringify({ code: code, token: token }));
             };
-            
+
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                log('Received: ' + JSON.stringify(data));
-                
-                if (data.action === 'auth' && data.status === 'success') {
-                    log('Authentication successful');
-                }
-                
-                switch(data.action) {
-                    case 'users':
-                        displayUsers(data.data);
-                        break;
-                    case 'alerts':
-                        displayAlerts(data.data);
-                        break;
-                    case 'geofence_colors':
-                        updateGeofenceColors(data.data);
-                        break;
-                    case 'user_clusters':
-                        displayClusters(data.data);
-                        break;
+                if (data.token) {
+                    token = data.token;
+                    addMessage('Received new token: ' + token);
+                    document.getElementById('tokenInput').value = token;
+                } else if (data.notification) {
+                    addMessage('Notification: ' + data.notification);
+                } else if (data.error) {
+                    addMessage('Error: ' + data.error);
+                } else {
+                    addMessage('Received: ' + event.data);
                 }
             };
-            
+
             socket.onclose = function(event) {
-                log('WebSocket disconnected');
-                updateConnectionStatus(false);
+                if (event.wasClean) {
+                    addMessage(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                } else {
+                    addMessage('Connection died');
+                }
             };
-            
+
             socket.onerror = function(error) {
-                log('WebSocket error: ' + error);
-                updateConnectionStatus(false);
+                addMessage(`Error: ${error.message}`);
             };
         }
 
-        function updateConnectionStatus(connected) {
-            const statusDiv = document.getElementById('connectionStatus');
-            if (connected) {
-                statusDiv.className = 'status connected';
-                statusDiv.textContent = 'Connected';
-            } else {
-                statusDiv.className = 'status disconnected';
-                statusDiv.textContent = 'Disconnected';
+        function updatePosition() {
+            const lat = document.getElementById('latInput').value;
+            const lon = document.getElementById('lonInput').value;
+            socket.send(JSON.stringify({ position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
+            addMessage(`Sent position update: lat=${lat}, lon=${lon}`);
+        }
+
+        function updateTransportMethod() {
+            const transportMode = document.getElementById('transportInput').value;
+            socket.send(JSON.stringify({ transport_mode: transportMode }));
+            addMessage(`Sent transport method update: ${transportMode}`);
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                addMessage('Disconnected from server');
             }
         }
 
-        // ... (rest of the JavaScript functions remain the same)
-
-        window.onload = initMap;
+        function addMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += message + '<br>';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
     </script>
 </body>
 </html>
