@@ -13,6 +13,7 @@ const Dashboard = () => {
         const response = await fetch('http://localhost:3001/api/users'); // Adjust API endpoint
         const data = await response.json();
         setUserPositions(data.features); // Assuming GeoJSON structure
+        console.log(userPositions)
       } catch (error) {
         console.error('Error fetching user positions:', error);
       }

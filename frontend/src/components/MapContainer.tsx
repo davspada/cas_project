@@ -6,55 +6,79 @@ import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
 import VectorLayer from 'ol/layer/Vector';
-import useUserMarkers from '@/hooks/useUserMarkers'; // Import the custom hook
+import { Feature } from 'ol';
+import Point from 'ol/geom/Point';
 import { fromLonLat } from 'ol/proj';
+import { Circle as CircleStyle, Fill, Style } from 'ol/style';
+import { kMeansClustering } from '@/utils/kMeans';
+import { UserPosition } from '@/types'; // Define or import the UserPosition interface
+import VectorSource from 'ol/source/Vector';
 
 interface MapContainerProps {
-  userPositions: Array<any>; // Adjust according to the structure of your data
-  mobilityFilter: string;    // 'walking', 'car', or 'all'
+  userPositions: UserPosition[];
+  mobilityFilter: string; // 'walking', 'car', or 'all'
 }
 
 const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilter }) => {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<Map | null>(null);  // Store the map instance
-  const userMarkersLayerRef = useRef<VectorLayer | null>(null);  // Store the user markers layer
+  const mapInstanceRef = useRef<Map | null>(null);
+  const userMarkersLayerRef = useRef<VectorLayer | null>(null);
 
-  // Get the vector source from the custom hook
-  const userMarkersSource = useUserMarkers({ userPositions, mobilityFilter });
+  // Filter positions based on mobilityFilter
+  const filteredPositions = userPositions.filter(position => 
+    mobilityFilter === 'all' || position.properties.transportation_mode === mobilityFilter
+  );
+
+  // Cluster the filtered user positions (e.g., into 5 clusters)
+  const clusterCount = 2;
+  const clusters = kMeansClustering(filteredPositions, clusterCount);
+
+  const clusterFeatures = clusters.map(cluster => {
+    const [lon, lat] = cluster.centroid;
+    return new Feature({
+      geometry: new Point(fromLonLat([lon, lat])),
+    });
+  });
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
-      // Create the base map if it doesn't exist yet
       const baseMap = new TileLayer({
         source: new OSM(),
       });
 
-      // Initialize the map and store the instance
       mapInstanceRef.current = new Map({
         target: mapRef.current,
-        layers: [
-          baseMap, // Base layer
-        ],
+        layers: [baseMap],
         view: new View({
-          center: fromLonLat([11.3394883, 44.4938134]), // Center on Bologna
+          center: fromLonLat([11.3394883, 44.4938134]),
           zoom: 15,
         }),
       });
 
-      // Create and store the user markers layer
       userMarkersLayerRef.current = new VectorLayer({
-        source: userMarkersSource,
+        source: new VectorSource({
+          features: clusterFeatures,
+        }),
+        style: new Style({
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: 'blue' }),
+          }),
+        }),
       });
-      mapInstanceRef.current.addLayer(userMarkersLayerRef.current); // Add the layer to the map
+      mapInstanceRef.current.addLayer(userMarkersLayerRef.current);
     }
-  }, []); // Only run once to initialize the map
+  }, []);
 
   useEffect(() => {
-    // Update the features in the user markers layer when the filter changes
     if (userMarkersLayerRef.current) {
-      userMarkersLayerRef.current.setSource(userMarkersSource); // Update the source
+      const clusteredSource = new VectorSource({
+        features: clusterFeatures,
+      });
+
+      userMarkersLayerRef.current.setSource(clusteredSource);
     }
-  }, [userMarkersSource]); // Only update the markers when the data or filter changes
+  }, [clusters]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '1000px' }} />;
 };
