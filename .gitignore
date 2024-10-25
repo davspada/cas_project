@@ -17,22 +17,6 @@ backend/*.bak
 
 # IDE specifici
 backend/.vscode/
-# Directory dei dati di Next.js
-frontend/.next/
 
-# File di configurazione sensibili
-frontend/.env
-
-# Log di Next.js
-frontend/*.log
-
-# File temporanei
-frontend/*.tmp
-frontend/*.swp
-
-# Backup
-frontend/*~ 
-frontend/*.bak
-
-# IDE specifici
-frontend/.vscode/
+backend/target/
+backend/data/
