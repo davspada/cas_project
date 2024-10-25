@@ -1,6 +1,6 @@
 // components/MapContainer.tsx
 "use client";
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
@@ -13,6 +13,7 @@ import { Circle as CircleStyle, Fill, Style } from 'ol/style';
 import { kMeansClustering } from '@/utils/kMeans';
 import { UserPosition } from '@/types'; // Define or import the UserPosition interface
 import VectorSource from 'ol/source/Vector';
+import useUserMarkers from '@/hooks/useUserMarkers'; // Import your useUserMarkers hook
 
 interface MapContainerProps {
   userPositions: UserPosition[];
@@ -23,14 +24,15 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const userMarkersLayerRef = useRef<VectorLayer | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(15);
 
   // Filter positions based on mobilityFilter
   const filteredPositions = userPositions.filter(position => 
     mobilityFilter === 'all' || position.properties.transportation_mode === mobilityFilter
   );
 
-  // Cluster the filtered user positions (e.g., into 5 clusters)
-  const clusterCount = 2;
+  // Determine cluster count based on zoom level
+  const clusterCount = Math.max(2, Math.min(10, Math.floor(zoomLevel / 2))); // Adjust the range as needed
   const clusters = kMeansClustering(filteredPositions, clusterCount);
 
   const clusterFeatures = clusters.map(cluster => {
@@ -39,6 +41,9 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
       geometry: new Point(fromLonLat([lon, lat])),
     });
   });
+
+  // Use userMarkers hook to get the styled user markers
+  const userMarkersSource = useUserMarkers({ userPositions, mobilityFilter });
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
@@ -51,7 +56,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
         layers: [baseMap],
         view: new View({
           center: fromLonLat([11.3394883, 44.4938134]),
-          zoom: 15,
+          zoom: zoomLevel,
         }),
       });
 
@@ -67,6 +72,12 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
         }),
       });
       mapInstanceRef.current.addLayer(userMarkersLayerRef.current);
+
+      // Listen to zoom level changes
+      mapInstanceRef.current.getView().on('change:resolution', () => {
+        const newZoomLevel = Math.round(mapInstanceRef.current!.getView().getZoom() ?? zoomLevel);
+        setZoomLevel(newZoomLevel);
+      });
     }
   }, []);
 
@@ -79,6 +90,21 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
       userMarkersLayerRef.current.setSource(clusteredSource);
     }
   }, [clusters]);
+
+  // Update user markers layer based on zoom level
+  useEffect(() => {
+    if (userMarkersLayerRef.current) {
+      if (zoomLevel >= 18) { // Adjust the zoom level threshold as needed
+        userMarkersLayerRef.current.setSource(userMarkersSource);
+      } else {
+        // If zoom level is below threshold, show clustered features only
+        const clusteredSource = new VectorSource({
+          features: clusterFeatures,
+        });
+        userMarkersLayerRef.current.setSource(clusteredSource);
+      }
+    }
+  }, [zoomLevel, userMarkersSource]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '1000px' }} />;
 };
