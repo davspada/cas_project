@@ -30,18 +30,22 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const [showGeofences, setShowGeofences] = useState(true);
   const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>(null);
 
+  // Custom hook for managing geofence layer and interactions
   const { geofenceLayer, addInteraction, toggleEditing, isEditing } = useGeofences({
     mapInstance: mapInstanceRef.current,
   });
 
+  // Filter user positions based on mobility filter
   const filteredPositions = userPositions.filter(
     (position) => mobilityFilter === 'all' || position.properties.transportation_mode === mobilityFilter
   );
 
+  // Determine cluster count based on mode and zoom level
   const autoClusterCount = Math.max(2, Math.min(10, Math.floor(zoomLevel / 2)));
   const actualClusterCount = clusteringMode === 'manual' ? numClusters : autoClusterCount;
   const clusters = kMeansClustering(filteredPositions, actualClusterCount);
 
+  // Convert clusters into OpenLayers features
   const clusterFeatures = clusters.map((cluster) => {
     const [lon, lat] = cluster.centroid;
     return new Feature({
@@ -49,10 +53,12 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
     });
   });
 
+  // Source for individual user markers
   const userMarkersSource = useUserMarkers({ userPositions, mobilityFilter });
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
+      // Initialize the map
       const baseMap = new TileLayer({
         source: new OSM(),
       });
@@ -66,6 +72,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
         }),
       });
 
+      // Layer for clustered user markers
       userMarkersLayerRef.current = new VectorLayer({
         source: new VectorSource({
           features: clusterFeatures,
@@ -79,6 +86,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
       });
       mapInstanceRef.current.addLayer(userMarkersLayerRef.current);
 
+      // Zoom level listener
       mapInstanceRef.current.getView().on('change:resolution', () => {
         const newZoomLevel = Math.round(mapInstanceRef.current!.getView().getZoom() ?? zoomLevel);
         setZoomLevel(newZoomLevel);
@@ -97,6 +105,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
 
   useEffect(() => {
     if (userMarkersLayerRef.current) {
+      // Switch to individual markers at high zoom levels
       if (zoomLevel >= 18) {
         userMarkersLayerRef.current.setSource(userMarkersSource);
       } else {
@@ -115,14 +124,8 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   }, [showGeofences, geofenceLayer]);
 
   useEffect(() => {
-    if (drawingType && typeof addInteraction === 'function') {
-      addInteraction(drawingType);
-    }
-    return () => {
-      if (drawingType && typeof addInteraction === 'function') {
-        addInteraction(null); // Stop interaction when type changes
-      }
-    };
+    // Add or remove the drawing interaction based on drawingType
+    addInteraction(drawingType);
   }, [drawingType, addInteraction]);
 
   return (

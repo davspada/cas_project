@@ -3,8 +3,6 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Draw, Modify, Snap } from 'ol/interaction';
 import { Feature } from 'ol';
-import Polygon from 'ol/geom/Polygon';
-import Circle from 'ol/geom/Circle';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
 
@@ -23,7 +21,6 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     useEffect(() => {
         if (!mapInstance) return;
 
-        // Source for geofences
         const source = new VectorSource();
         const layer = new VectorLayer({
             source,
@@ -40,32 +37,43 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         };
     }, [mapInstance]);
 
-    const addInteraction = useCallback((type: 'Polygon' | 'Circle') => {
+    const addInteraction = useCallback((type: 'Polygon' | 'Circle' | null) => {
         if (!mapInstance || !geofenceLayer) return;
 
-        const draw = new Draw({
-            source: geofenceLayer.getSource()!,
-            type,
-        });
-        mapInstance.addInteraction(draw);
-        setDrawInteraction(draw);
-
-        draw.on('drawend', (event) => {
-            const newFeature = event.feature;
-            setGeofenceData((prevData) => [...prevData, newFeature]);
-            console.log('New geofence data:', newFeature.getGeometry()?.getCoordinates());
-        });
-
-        const snap = new Snap({ source: geofenceLayer.getSource()! });
-        mapInstance.addInteraction(snap);
-        setSnapInteraction(snap);
-
-        return () => {
-            mapInstance.removeInteraction(draw);
-            mapInstance.removeInteraction(snap);
+        // Remove existing interactions if any
+        if (drawInteraction) {
+            mapInstance.removeInteraction(drawInteraction);
             setDrawInteraction(null);
+        }
+        if (snapInteraction) {
+            mapInstance.removeInteraction(snapInteraction);
             setSnapInteraction(null);
-        };
+        }
+
+        if (type === 'Polygon' || type === 'Circle') {
+            console.log("NEW INTERACTION ADDED"+ type);
+            const draw = new Draw({
+                source: geofenceLayer.getSource()!,
+                type,
+            });
+            mapInstance.addInteraction(draw);
+            setDrawInteraction(draw);
+
+            const snap = new Snap({ source: geofenceLayer.getSource()! });
+            mapInstance.addInteraction(snap);
+            setSnapInteraction(snap);
+
+            draw.on('drawend', (event) => {
+                const newFeature = event.feature;
+                setGeofenceData((prevData) => [...prevData, newFeature]);
+                console.log('New geofence data:', newFeature.getGeometry()?.getCoordinates());
+            });
+        }
+        else{ //happens if type is null
+            //Remove any existing interactions, first a drawing one, then the snap one
+            mapInstance.getInteractions().pop();
+            mapInstance.getInteractions().pop();
+        }
     }, [mapInstance, geofenceLayer]);
 
     const enableEditing = useCallback(() => {
@@ -82,27 +90,9 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         const snap = new Snap({ source: geofenceLayer.getSource()! });
         mapInstance.addInteraction(snap);
         setSnapInteraction(snap);
-
-        return () => {
-            mapInstance.removeInteraction(modify);
-            mapInstance.removeInteraction(snap);
-            setModifyInteraction(null);
-            setSnapInteraction(null);
-        };
     }, [mapInstance, geofenceLayer]);
 
-    const toggleDrawing = (type: 'Polygon' | 'Circle') => {
-        if (drawInteraction) {
-            mapInstance?.removeInteraction(drawInteraction);
-            mapInstance?.removeInteraction(snapInteraction);
-            setDrawInteraction(null);
-            setSnapInteraction(null);
-        } else {
-            addInteraction(type);
-        }
-    };
-
-    const toggleEditing = () => {
+    const toggleEditing = useCallback(() => {
         if (modifyInteraction) {
             mapInstance?.removeInteraction(modifyInteraction);
             mapInstance?.removeInteraction(snapInteraction);
@@ -113,7 +103,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
             enableEditing();
             setIsEditing(true);
         }
-    };
+    }, [enableEditing, modifyInteraction, snapInteraction, mapInstance]);
 
-    return { geofenceLayer, toggleDrawing, toggleEditing, isEditing, setIsEditing, addInteraction };
+    return { geofenceLayer, toggleEditing, isEditing, addInteraction };
 }
