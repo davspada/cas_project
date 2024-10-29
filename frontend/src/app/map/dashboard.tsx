@@ -1,12 +1,16 @@
 "use client";
 import { useState, useEffect } from 'react';
 import MapContainer from '@/components/MapContainer';
+import { LoadingSpinner } from '@/components/loading_spinner';
 
 const Dashboard = () => {
   const [mobilityFilter, setMobilityFilter] = useState('all');
   const [userPositions, setUserPositions] = useState([]);
   const [numClusters, setNumClusters] = useState(1);
   const [clusteringMode, setClusteringMode] = useState('automatic'); // New state for clustering mode
+  const [showGeofences, setShowGeofences] = useState(true); // Toggle for geofence visibility
+  const [drawingMode, setDrawingMode] = useState<null | 'Polygon' | 'Circle'>(null); // Drawing mode for geofences
+  const [isEditingGeofences, setIsEditingGeofences] = useState(false); // Toggle for geofence editing
 
   // Fetch user data from API
   useEffect(() => {
@@ -60,6 +64,20 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Geofence Controls 
+      <div>
+        <label>Geofences:</label>
+        <button onClick={() => setShowGeofences(!showGeofences)}>
+          {showGeofences ? 'Hide Geofences' : 'Show Geofences'}
+        </button>
+        <button onClick={() => setDrawingMode('Polygon')}>Draw Polygon</button>
+        <button onClick={() => setDrawingMode('Circle')}>Draw Circle</button>
+        <button onClick={() => setIsEditingGeofences(!isEditingGeofences)}>
+          {isEditingGeofences ? 'Disable Editing' : 'Enable Editing'}
+        </button>
+      </div>
+      */}
+
       {/* Only render MapContainer when userPositions is not empty */}
       {userPositions.length > 0 ? (
         <MapContainer 
@@ -67,9 +85,13 @@ const Dashboard = () => {
           mobilityFilter={mobilityFilter} 
           numClusters={numClusters} 
           clusteringMode={clusteringMode} // Pass clusteringMode to MapContainer
+          showGeofences={showGeofences} // Pass geofence toggle
+          drawingMode={drawingMode} // Pass drawing mode for geofences
+          isEditingGeofences={isEditingGeofences} // Pass editing mode for geofences
+          onDrawingModeChange={setDrawingMode} // Reset drawing mode after drawing
         />
       ) : (
-        <p>Loading map data...</p>
+        <LoadingSpinner />
       )}
     </div>
   );
