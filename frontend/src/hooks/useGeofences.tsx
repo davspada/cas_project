@@ -51,7 +51,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         }
 
         if (type === 'Polygon' || type === 'Circle') {
-            console.log("NEW INTERACTION ADDED"+ type);
+            console.log("NEW INTERACTION ADDED :"+ type);
             const draw = new Draw({
                 source: geofenceLayer.getSource()!,
                 type,
@@ -69,8 +69,9 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
                 console.log('New geofence data:', newFeature.getGeometry()?.getCoordinates());
             });
         }
-        else{ //happens if type is null
+        else if(type === null){ //happens if type is null
             //Remove any existing interactions, first a drawing one, then the snap one
+            console.log("interaction pop call")
             mapInstance.getInteractions().pop();
             mapInstance.getInteractions().pop();
         }

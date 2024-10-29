@@ -28,7 +28,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const userMarkersLayerRef = useRef<VectorLayer | null>(null);
   const [zoomLevel, setZoomLevel] = useState(15);
   const [showGeofences, setShowGeofences] = useState(true);
-  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>(null);
+  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>('none');
 
   // Custom hook for managing geofence layer and interactions
   const { geofenceLayer, addInteraction, toggleEditing, isEditing } = useGeofences({
