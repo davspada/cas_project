@@ -94,6 +94,8 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     }, [mapInstance, geofenceLayer]);
 
     const toggleEditing = useCallback(() => {
+        if (!mapInstance) return;
+        
         if (modifyInteraction) {
             mapInstance?.removeInteraction(modifyInteraction);
             mapInstance?.removeInteraction(snapInteraction);

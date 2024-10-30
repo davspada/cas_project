@@ -132,10 +132,16 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
     <div>
       <div ref={mapRef} style={{ width: '100%', height: '750px' }} />
       <div className="controls">
-        <button onClick={() => setDrawingType(drawingType === 'Polygon' ? null : 'Polygon')}>
+        <button
+          onClick={() => setDrawingType(drawingType === 'Polygon' ? null : 'Polygon')}
+          disabled={drawingType === 'Circle'}
+        >
           {drawingType === 'Polygon' ? 'Stop Drawing Polygon' : 'Draw Polygon'}
         </button>
-        <button onClick={() => setDrawingType(drawingType === 'Circle' ? null : 'Circle')}>
+        <button
+          onClick={() => setDrawingType(drawingType === 'Circle' ? null : 'Circle')}
+          disabled={drawingType === 'Polygon'}
+        >
           {drawingType === 'Circle' ? 'Stop Drawing Circle' : 'Draw Circle'}
         </button>
         <button onClick={toggleEditing}>
