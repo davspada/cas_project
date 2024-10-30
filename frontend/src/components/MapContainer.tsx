@@ -28,11 +28,12 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const userMarkersLayerRef = useRef<VectorLayer | null>(null);
   const [zoomLevel, setZoomLevel] = useState(15);
   const [showGeofences, setShowGeofences] = useState(true);
-  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>('none');
+  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>('None');
 
   // Custom hook for managing geofence layer and interactions
   const { geofenceLayer, addInteraction, toggleEditing, isEditing } = useGeofences({
     mapInstance: mapInstanceRef.current,
+    alerts: null, // Pass alerts data here if needed
   });
 
   // Filter user positions based on mobility filter

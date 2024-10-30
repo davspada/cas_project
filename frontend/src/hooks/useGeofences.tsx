@@ -10,7 +10,7 @@ import { Alert } from '@/types';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
-    alerts: Alert[];
+    alerts: Alert[] | null;
 }
 
 export default function useGeofences({ mapInstance }: UseGeofencesProps) {
@@ -90,10 +90,17 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
             });
         }
         else if(type === null){ //happens if type is null
-            //Remove any existing interactions, first a drawing one, then the snap one
-            console.log("interaction pop call")
-            mapInstance.getInteractions().pop();
-            mapInstance.getInteractions().pop();
+            //Remove any existing draw interactions
+            console.log("interaction pop call");
+            let draw_interaction = undefined;
+            mapInstance.getInteractions().forEach(function (interaction) {
+            if (interaction instanceof Draw) {
+                draw_interaction = interaction;
+            }
+            });
+            if (draw_interaction) {
+                mapInstance.removeInteraction(draw_interaction);
+            }
         }
     }, [mapInstance, geofenceLayer]);
 
