@@ -5,9 +5,12 @@ import { Draw, Modify, Snap } from 'ol/interaction';
 import { Feature } from 'ol';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
+import { GeoJSON } from 'ol/format';
+import { Alert } from '@/types';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
+    alerts: Alert[];
 }
 
 export default function useGeofences({ mapInstance }: UseGeofencesProps) {
@@ -31,6 +34,23 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         });
         setGeofenceLayer(layer);
         mapInstance.addLayer(layer);
+
+        const fetchAlerts = async () => {
+            try {
+                const response = await fetch('http://localhost:3001/api/alerts'); // Adjust API endpoint
+                const data = await response.json();
+                const format = new GeoJSON();
+                const features = format.readFeatures(data, {
+                    featureProjection: mapInstance.getView().getProjection(),
+                });
+                source.addFeatures(features);
+                setGeofenceData(features);
+            } catch (error) {
+                console.error('Error fetching user positions:', error);
+            }
+        };
+
+        fetchAlerts();
 
         return () => {
             mapInstance.removeLayer(layer);
