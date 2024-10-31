@@ -6,6 +6,7 @@ import { Feature } from 'ol';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
 import { GeoJSON } from 'ol/format';
+import { click, pointerMove } from 'ol/events/condition';
 import { Alert } from '@/types';
 
 interface UseGeofencesProps {
@@ -20,7 +21,8 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     const [drawInteraction, setDrawInteraction] = useState<Draw | null>(null);
     const [modifyInteraction, setModifyInteraction] = useState<Modify | null>(null);
     const [snapInteraction, setSnapInteraction] = useState<Snap | null>(null);
-    const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
+    const [hoverSelectInteraction, setHoverSelectInteraction] = useState<Select | null>(null);
+    const [clickSelectInteraction, setClickSelectInteraction] = useState<Select | null>(null);
 
     useEffect(() => {
         if (!mapInstance) return;
@@ -52,16 +54,65 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         };
 
         fetchAlerts();
-        enableSelectInteraction();
+        enableHoverPreview();
+        enableClickSelection();
+
         return () => {
             mapInstance.removeLayer(layer);
         };
     }, [mapInstance]);
 
+    const enableHoverPreview = useCallback(() => {
+        if (!mapInstance || !geofenceLayer) return;
+
+        const hoverSelect = new Select({
+            condition: pointerMove,
+            layers: [geofenceLayer],
+            style: new Style({
+                fill: new Fill({ color: 'rgba(0, 255, 0, 0.3)' }),
+                stroke: new Stroke({ color: '#00FF00', width: 2 }),
+            }),
+        });
+        mapInstance.addInteraction(hoverSelect);
+        setHoverSelectInteraction(hoverSelect);
+
+        hoverSelect.on('select', (event) => {
+            console.log('Hovered feature:', event.selected);
+            // Optionally, show a tooltip or other UI feedback on hover
+        });
+    }, [mapInstance, geofenceLayer]);
+
+    const enableClickSelection = useCallback(() => {
+        if (!mapInstance || !geofenceLayer) return;
+
+        const clickSelect = new Select({
+            condition: click,
+            layers: [geofenceLayer],
+            style: new Style({
+                fill: new Fill({ color: 'rgba(255, 0, 0, 0.3)' }),
+                stroke: new Stroke({ color: '#FF0000', width: 2 }),
+            }),
+        });
+        mapInstance.addInteraction(clickSelect);
+        setClickSelectInteraction(clickSelect);
+
+        clickSelect.on('select', (event) => {
+            const selectedFeatures = event.selected;
+            console.log('Selected features:', selectedFeatures);
+            // Display popup or other UI feedback for selected features
+
+            if (selectedFeatures.length > 1) {
+                // Handle overlapping features
+                const topFeature = selectedFeatures[selectedFeatures.length - 1];
+                console.log('Topmost selected feature:', topFeature.getProperties());
+                // Handle overlapping feature logic, e.g., showing options for each feature
+            }
+        });
+    }, [mapInstance, geofenceLayer]);
+
     const addInteraction = useCallback((type: 'Polygon' | 'Circle' | null) => {
         if (!mapInstance || !geofenceLayer) return;
 
-        // Remove existing interactions if any
         if (drawInteraction) {
             mapInstance.removeInteraction(drawInteraction);
             setDrawInteraction(null);
@@ -72,7 +123,6 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         }
 
         if (type === 'Polygon' || type === 'Circle') {
-            console.log("NEW INTERACTION ADDED :"+ type);
             const draw = new Draw({
                 source: geofenceLayer.getSource()!,
                 type,
@@ -125,8 +175,8 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         if (!mapInstance) return;
         
         if (modifyInteraction) {
-            mapInstance?.removeInteraction(modifyInteraction);
-            mapInstance?.removeInteraction(snapInteraction);
+            mapInstance.removeInteraction(modifyInteraction);
+            mapInstance.removeInteraction(snapInteraction);
             setModifyInteraction(null);
             setSnapInteraction(null);
             setIsEditing(false);
@@ -135,32 +185,23 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
             setIsEditing(true);
         }
     }, [enableEditing, modifyInteraction, snapInteraction, mapInstance]);
-
-    const enableSelectInteraction = useCallback(() => {
-        if (!mapInstance || !geofenceLayer) return;
-
-        const select = new Select({
-            layers: [geofenceLayer],
-        });
-        mapInstance.addInteraction(select);
-        setSelectInteraction(select);
-
-        select.on('select', (event) => {
-            const selectedFeatures = event.selected;
-            if (selectedFeatures.length > 0) {
-                const feature = selectedFeatures[0];
-                // Show popup or UI for the selected feature (details, edit, delete options)
-                console.log('Selected feature:', feature.getProperties());
-            }
-        });
-    }, [mapInstance, geofenceLayer]);
-
+    
     const disableSelectInteraction = useCallback(() => {
-        if (mapInstance && selectInteraction) {
-            mapInstance.removeInteraction(selectInteraction);
-            setSelectInteraction(null);
+        if (mapInstance && clickSelectInteraction && hoverSelectInteraction) {
+            mapInstance.removeInteraction(clickSelectInteraction);
+            setClickSelectInteraction(null);
+            mapInstance.removeInteraction(hoverSelectInteraction);
+            setHoverSelectInteraction(null);
         }
-    }, [mapInstance, selectInteraction]);
+    }, [mapInstance, clickSelectInteraction, hoverSelectInteraction]);
 
-    return { geofenceLayer, toggleEditing, isEditing, addInteraction, enableSelectInteraction, disableSelectInteraction };
+    return {
+        geofenceLayer,
+        toggleEditing,
+        isEditing,
+        addInteraction,
+        enableHoverPreview,
+        enableClickSelection,
+        disableSelectInteraction
+    };
 }
