@@ -28,10 +28,11 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   const userMarkersLayerRef = useRef<VectorLayer | null>(null);
   const [zoomLevel, setZoomLevel] = useState(15);
   const [showGeofences, setShowGeofences] = useState(true);
-  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>('None');
+  const [drawingType, setDrawingType] = useState<'Polygon' | 'Circle' | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   // Custom hook for managing geofence layer and interactions
-  const { geofenceLayer, addInteraction, toggleEditing, isEditing } = useGeofences({
+  const { geofenceLayer, addInteraction, toggleEditing, isEditing, enableSelectInteraction, disableSelectInteraction } = useGeofences({
     mapInstance: mapInstanceRef.current,
     alerts: null, // Pass alerts data here if needed
   });
@@ -122,12 +123,23 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
     if (geofenceLayer) {
       geofenceLayer.setVisible(showGeofences);
     }
+    //console.log(drawingType)
   }, [showGeofences, geofenceLayer]);
 
   useEffect(() => {
     // Add or remove the drawing interaction based on drawingType
     addInteraction(drawingType);
   }, [drawingType, addInteraction]);
+
+    // Handle toggling the select interaction
+  const handleToggleSelect = () => {
+    if (isSelecting) {
+      disableSelectInteraction();
+    } else {
+      enableSelectInteraction();
+    }
+    setIsSelecting(!isSelecting);
+  };
 
   return (
     <div>
@@ -145,11 +157,14 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
         >
           {drawingType === 'Circle' ? 'Stop Drawing Circle' : 'Draw Circle'}
         </button>
-        <button onClick={toggleEditing} disabled={drawingType !== null}>
+        <button onClick={toggleEditing} disabled={drawingType != null}>
           {isEditing ? 'Disable Editing' : 'Enable Editing'}
         </button>
         <button onClick={() => setShowGeofences(!showGeofences)}>
           {showGeofences ? 'Hide Geofences' : 'Show Geofences'}
+        </button>
+        <button onClick={handleToggleSelect} disabled={drawingType != null || isEditing}>
+          {isSelecting ? 'Disable Selection' : 'Enable Selection'}
         </button>
       </div>
     </div>

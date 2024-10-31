@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
-import { Draw, Modify, Snap } from 'ol/interaction';
+import { Draw, Modify, Select, Snap } from 'ol/interaction';
 import { Feature } from 'ol';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
@@ -20,6 +20,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     const [drawInteraction, setDrawInteraction] = useState<Draw | null>(null);
     const [modifyInteraction, setModifyInteraction] = useState<Modify | null>(null);
     const [snapInteraction, setSnapInteraction] = useState<Snap | null>(null);
+    const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
 
     useEffect(() => {
         if (!mapInstance) return;
@@ -51,7 +52,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         };
 
         fetchAlerts();
-
+        enableSelectInteraction();
         return () => {
             mapInstance.removeLayer(layer);
         };
@@ -135,5 +136,31 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         }
     }, [enableEditing, modifyInteraction, snapInteraction, mapInstance]);
 
-    return { geofenceLayer, toggleEditing, isEditing, addInteraction };
+    const enableSelectInteraction = useCallback(() => {
+        if (!mapInstance || !geofenceLayer) return;
+
+        const select = new Select({
+            layers: [geofenceLayer],
+        });
+        mapInstance.addInteraction(select);
+        setSelectInteraction(select);
+
+        select.on('select', (event) => {
+            const selectedFeatures = event.selected;
+            if (selectedFeatures.length > 0) {
+                const feature = selectedFeatures[0];
+                // Show popup or UI for the selected feature (details, edit, delete options)
+                console.log('Selected feature:', feature.getProperties());
+            }
+        });
+    }, [mapInstance, geofenceLayer]);
+
+    const disableSelectInteraction = useCallback(() => {
+        if (mapInstance && selectInteraction) {
+            mapInstance.removeInteraction(selectInteraction);
+            setSelectInteraction(null);
+        }
+    }, [mapInstance, selectInteraction]);
+
+    return { geofenceLayer, toggleEditing, isEditing, addInteraction, enableSelectInteraction, disableSelectInteraction };
 }
