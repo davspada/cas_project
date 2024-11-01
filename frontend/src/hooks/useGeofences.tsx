@@ -8,6 +8,8 @@ import { Map } from 'ol';
 import { GeoJSON } from 'ol/format';
 import { click, pointerMove } from 'ol/events/condition';
 import { Alert } from '@/types';
+import { getClosestFeatureByWorldDistance } from '@/utils/mapUtils';
+import { FeatureLike } from 'ol/Feature';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
@@ -17,6 +19,7 @@ interface UseGeofencesProps {
 export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     const [geofenceLayer, setGeofenceLayer] = useState<VectorLayer | null>(null);
     const [geofenceData, setGeofenceData] = useState<Feature[]>([]);
+    const [selectedFeaturesSource] = useState(new VectorSource());
     const [isEditing, setIsEditing] = useState(false);
     const [drawInteraction, setDrawInteraction] = useState<Draw | null>(null);
     const [modifyInteraction, setModifyInteraction] = useState<Modify | null>(null);
@@ -37,6 +40,15 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         });
         setGeofenceLayer(layer);
         mapInstance.addLayer(layer);
+
+        const selectedFeaturesLayer = new VectorLayer({
+            source: selectedFeaturesSource,
+            style: new Style({
+                fill: new Fill({ color: 'rgba(255, 0, 0, 0.1)' }),
+                stroke: new Stroke({ color: '#0000FF', width: 2 }),
+            }),
+        });
+        mapInstance.addLayer(selectedFeaturesLayer);
 
         const fetchAlerts = async () => {
             try {
@@ -64,48 +76,66 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
 
     const enableHoverPreview = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
-
+    
         const hoverSelect = new Select({
             condition: pointerMove,
             layers: [geofenceLayer],
-            style: new Style({
+            /*style: new Style({
                 fill: new Fill({ color: 'rgba(0, 255, 0, 0.3)' }),
                 stroke: new Stroke({ color: '#00FF00', width: 2 }),
-            }),
+            }),*/
+            multi: true,
+
         });
         mapInstance.addInteraction(hoverSelect);
-        setHoverSelectInteraction(hoverSelect);
-
-        hoverSelect.on('select', (event) => {
-            console.log('Hovered feature:', event.selected);
-            // Optionally, show a tooltip or other UI feedback on hover
+    
+        mapInstance.on('pointermove', (event) => {
+            const features = mapInstance.getFeaturesAtPixel(event.pixel, {
+                layerFilter: (layer) => layer === geofenceLayer,
+            });
+            var selectedFeature = null;
+            if (features.length > 0) {
+                const lastFeatureIndex = features.length - 1;
+                selectedFeature = features[lastFeatureIndex];
+            }else{
+                selectedFeature = features[0]
+            }
         });
     }, [mapInstance, geofenceLayer]);
+    
 
     const enableClickSelection = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
-
+    
         const clickSelect = new Select({
             condition: click,
             layers: [geofenceLayer],
             style: new Style({
-                fill: new Fill({ color: 'rgba(255, 0, 0, 0.3)' }),
+                //fill: new Fill({ color: 'rgba(255, 0, 0, 0.3)' }),
                 stroke: new Stroke({ color: '#FF0000', width: 2 }),
             }),
+            multi: false,
         });
         mapInstance.addInteraction(clickSelect);
-        setClickSelectInteraction(clickSelect);
-
-        clickSelect.on('select', (event) => {
-            const selectedFeatures = event.selected;
-            console.log('Selected features:', selectedFeatures);
-            // Display popup or other UI feedback for selected features
-
-            if (selectedFeatures.length > 1) {
-                // Handle overlapping features
-                const topFeature = selectedFeatures[selectedFeatures.length - 1];
-                console.log('Topmost selected feature:', topFeature.getProperties());
-                // Handle overlapping feature logic, e.g., showing options for each feature
+    
+        mapInstance.on('click', (event) => {
+            const features = mapInstance.getFeaturesAtPixel(event.pixel, {
+                layerFilter: (layer) => layer === geofenceLayer,
+            });
+            var selectedFeature = null;
+            console.log(features.length)
+            if (features.length > 1) {
+                const lastFeatureIndex = features.length;
+                selectedFeature = features[lastFeatureIndex];
+            }else{
+                selectedFeature = features[1]
+            }
+            //console.log(selectedFeature)
+            
+            if (selectedFeature) {
+                selectedFeaturesSource.addFeature(selectedFeature);
+            }else{
+                selectedFeaturesSource.clear();
             }
         });
     }, [mapInstance, geofenceLayer]);

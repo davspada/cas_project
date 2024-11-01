@@ -136,7 +136,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
     if (isSelecting) {
       disableSelectInteraction();
     } else {
-      enableHoverPreview();
+      //enableHoverPreview();
       enableClickSelection();
     }
     setIsSelecting(!isSelecting);
