@@ -84,9 +84,9 @@
         }
 
         function updateTransportMethod() {
-            const transportMode = document.getElementById('transportInput').value;
-            socket.send(JSON.stringify({ transport_mode: transportMode }));
-            addMessage(`Sent transport method update: ${transportMode}`);
+            const transportMethod = document.getElementById('transportInput').value;
+            socket.send(JSON.stringify({ transport_method: transportMethod }));
+            addMessage(`Sent transport method update: ${transportMethod}`);
         }
 
         function disconnect() {
