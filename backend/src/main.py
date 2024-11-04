@@ -8,9 +8,9 @@ from typing import Dict
 # Database connection details
 DB_CONFIG = {
     "host": "localhost",
-    "database": "mydb",
-    "user": "postgis",
-    "password": "password"
+    "database": "cas_db",
+    "user": "cas",
+    "password": "pw"
 }
 
 class WebSocketServer:
