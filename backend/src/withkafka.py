@@ -9,6 +9,8 @@ consumer = kafka.KafkaConsumer(
     value_deserializer=lambda v: json.loads(v.decode('utf-8'))
 )
 
+print("In ascolto...")
+
 # Lettura dei messaggi
 for message in consumer:
     print("Messaggio ricevuto:", message.value)

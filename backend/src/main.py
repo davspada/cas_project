@@ -17,13 +17,14 @@ DB_CONFIG = {
 
 KAFKA_HOST = 'localhost'
 
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WebSocketServer:
     def __init__(self):
         self.db_pool = None
         self.connected_mobile: Dict[str, websockets.WebSocketServerProtocol] = {}
+        self.connected_frontend: Dict[websockets.WebSocketServerProtocol, int] = {}
 
     async def connect_to_db(self):
         self.db_pool = await asyncpg.create_pool(**DB_CONFIG)
@@ -42,7 +43,7 @@ class WebSocketServer:
         )
 
     async def send_message (self, websocket, message):
-        await websocket.send(json.dumps({message}))
+        await websocket.send(json.dumps(message))
 
     async def update_location(self, code, position):
         try:
@@ -50,20 +51,20 @@ class WebSocketServer:
                 await conn.execute("UPDATE USERS SET position = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE code = $3",
                                    position['lon'], position['lat'], code)
             await self.send_message(self.connected_mobile[code], "Position updated")
-            await logger.info(f"User {code} updated position")
+            logger.info(f"User {code} updated position")
         except Exception as e:
             await self.send_message(self.connected_mobile[code], f"Error updating position: {str(e)}")
-            await logger.error(f"Error updating position for user {code}: {str(e)}")
+            logger.error(f"Error updating position for user {code}: {str(e)}")
 
     async def update_transport_method(self, code, transport_method):
         try:
             async with self.db_pool.acquire() as conn:
                 await conn.execute("UPDATE USERS SET transport_method = $1 WHERE code = $2", transport_method, code)
             await self.send_message(self.connected_mobile[code], "Transport method updated")
-            await logger.info(f"User {code} updated transport method")
+            logger.info(f"User {code} updated transport method")
         except Exception as e:
             await self.send_message(self.connected_mobile[code], f"Error updating transport method: {str(e)}")
-            await logger.error(f"Error updating transport method for user {code}: {str(e)}")
+            logger.error(f"Error updating transport method for user {code}: {str(e)}")
 
     async def handle_mobile(self, websocket, path):
         try:
@@ -85,7 +86,7 @@ class WebSocketServer:
                     db_token = row['token']
                     if db_token != mobile_token:
                         await self.send_message(websocket, "Error, invalid token")
-                        await logger.error(f"Invalid token for user {code}")
+                        logger.error(f"Invalid token for user {code}")
                         return
                 else:
                     # Generate new token and add to database
@@ -96,7 +97,7 @@ class WebSocketServer:
                 # Step 3: Update connected status
                 await conn.execute("UPDATE USERS SET connected = true WHERE code = $1", code)
                 await self.send_message(websocket, "Connected")
-                await logger.info(f"User {code} connected")
+                logger.info(f"User {code} connected")
 
             self.connected_mobile[code] = websocket
 
@@ -108,7 +109,6 @@ class WebSocketServer:
                 elif 'transport_method' in data:
                     await self.update_transport_method(code, data['transport_method'])
 
-                # TODO: Check if transport method is usefull
                 self.kafka_producer.send('user-updates', key=code.encode('utf-8'), value=data)
 
         except websockets.exceptions.ConnectionClosed:
@@ -120,7 +120,7 @@ class WebSocketServer:
                 async with self.db_pool.acquire() as conn:
                     await conn.execute("UPDATE USERS SET connected = false WHERE code = $1", code)
                 await self.send_message(websocket, "Disconnected")
-                await logger.info(f"User {code} disconnected")
+                logger.info(f"User {code} disconnected")
 
     # TODO
     async def check_users_in_danger(self):
@@ -133,12 +133,15 @@ class WebSocketServer:
             rows += await conn.fetch("SELECT geofence, time_start, description FROM ALERTS WHERE time_end IS NULL")
             for row in rows:
                 await websocket.send(json.dumps(row))
+                
+        self.connected_frontend[websocket] = len(self.connected_frontend.keys()) + 1
 
-        # Step 3: Listen for updates from Kafka
+        # Step 2: Listen for updates from Kafka
         async for message in self.kafka_consumer:
-            await websocket.send(json.dumps(message.value))
+            if message.key != self.connected_frontend[websocket] and message.topic != 'users-in-danger':
+                await websocket.send(json.dumps(message.value))
 
-        # Step 2: Await for frontend updates
+        # Step 3: Await for frontend updates
         async for message in websocket:
             data = json.loads(message)
             if 'time_end' in data:
@@ -149,7 +152,7 @@ class WebSocketServer:
             elif 'geofence' in data:
                 # Update the alerts table
                 async with self.db_pool.acquire() as conn:
-                    await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES ($1, $2, $3)",
+                    await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), $2, $3)",
                                        data['geofence'], data['time_start'], data['description'])
                 
                 #TODO: Create function to check users is in danger
