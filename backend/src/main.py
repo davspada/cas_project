@@ -17,7 +17,7 @@ DB_CONFIG = {
 
 KAFKA_HOST = 'localhost'
 
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WebSocketServer:
@@ -49,7 +49,7 @@ class WebSocketServer:
         try:
             async with self.db_pool.acquire() as conn:
                 await conn.execute("UPDATE USERS SET position = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE code = $3",
-                                   position['lon'], position['lat'], code)
+                                   position['lat'], position['lon'], code)
             await self.send_message(self.connected_mobile[code], "Position updated")
             logger.info(f"User {code} updated position")
         except Exception as e:
@@ -119,11 +119,12 @@ class WebSocketServer:
                 del self.connected_mobile[code]
                 async with self.db_pool.acquire() as conn:
                     await conn.execute("UPDATE USERS SET connected = false WHERE code = $1", code)
-                await self.send_message(websocket, "Disconnected")
                 logger.info(f"User {code} disconnected")
 
     # TODO
-    async def check_users_in_danger(self):
+    async def check_users_in_danger(self, geofence):
+        # Do a query to see what users are inside the geofence
+
         pass
 
     async def handle_frontend(self, websocket, path):
@@ -171,9 +172,6 @@ class WebSocketServer:
 
         server_mobile = await websockets.serve(self.handle_mobile, host, port)
         server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
-        
-        print(f"WebSocket mobile server is running on {host}:{port}")
-        print(f"WebSocket frontend server is running on {host}:{port + 1}")
 
         await server_mobile.wait_closed()
         await server_frontend.wait_closed()
