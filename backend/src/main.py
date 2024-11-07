@@ -22,12 +22,15 @@ logger = logging.getLogger(__name__)
 
 class WebSocketServer:
     def __init__(self):
+        self.name = "WebSocketServer"
         self.db_pool = None
         self.connected_mobile: Dict[str, websockets.WebSocketServerProtocol] = {}
         self.connected_frontend: Dict[websockets.WebSocketServerProtocol, int] = {}
 
     async def connect_to_db(self):
-        self.db_pool = await asyncpg.create_pool(**DB_CONFIG)
+        logger.info("Connecting to database...")
+        self.conn = await asyncpg.create_pool(**DB_CONFIG)
+        logger.info("Connected to database")
 
     async def subscribe_to_kafka_topic(self):
         self.kafka_consumer = kafka.KafkaConsumer(
@@ -111,8 +114,6 @@ class WebSocketServer:
 
                 self.kafka_producer.send('user-updates', key=code.encode('utf-8'), value=data)
 
-        except websockets.exceptions.ConnectionClosed:
-            pass
         finally:
             # Step 6: Handle disconnection
             if code in self.connected_mobile:
@@ -121,60 +122,105 @@ class WebSocketServer:
                     await conn.execute("UPDATE USERS SET connected = false WHERE code = $1", code)
                 logger.info(f"User {code} disconnected")
 
-    # TODO
-    async def check_users_in_danger(self, geofence):
-        # Do a query to see what users are inside the geofence
 
-        pass
+    async def check_users_in_danger(self, geofence, messages):
+        async with self.db_pool.acquire() as conn:
+            query_templates = {
+                'inside': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_Within(position, ST_GeomFromGeoJSON($1)) AND connected = true;
+                """,
+                'in_1km': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
+                        AND NOT ST_Within(position, ST_GeomFromGeoJSON($1))
+                        AND connected = true;
+                """,
+                'in_2km': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 2000)
+                        AND NOT ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
+                        AND connected = true;
+                """
+            }
+
+            for zone, query in query_templates.items():
+                results = await conn.fetch(query, geofence)
+                for point in results:
+                    self.kafka_producer.send(
+                        'users-in-danger',
+                        key=point['code'].encode('utf-8'),
+                        value=messages[zone]
+                    )
+
 
     async def handle_frontend(self, websocket, path):
-        # Step 1: Send actual state from db to frontend
-        async with self.db_pool.acquire() as conn:
-            rows = await conn.fetch("SELECT code, position, transport_method FROM USERS WHERE connected = true AND position IS NOT NULL AND transport_method IS NOT NULL")
-            rows += await conn.fetch("SELECT geofence, time_start, description FROM ALERTS WHERE time_end IS NULL")
-            for row in rows:
-                await websocket.send(json.dumps(row))
-                
-        self.connected_frontend[websocket] = len(self.connected_frontend.keys()) + 1
+        try:
+            logger.info("Frontend connected, sending data...")
+            # Step 0: Send welcome message
+            self.send_message(websocket, f"Connected to server {self.name}, all data from database is coming...")
 
-        # Step 2: Listen for updates from Kafka
-        async for message in self.kafka_consumer:
-            if message.key != self.connected_frontend[websocket] and message.topic != 'users-in-danger':
-                await websocket.send(json.dumps(message.value))
+            # Step 1: Send actual state from db to frontend
+            async with self.db_pool.acquire() as conn:
+                rows = await conn.fetch("SELECT code, position, transport_method FROM USERS WHERE connected = true AND position IS NOT NULL AND transport_method IS NOT NULL")
+                rows += await conn.fetch("SELECT geofence, time_start, description FROM ALERTS WHERE time_end IS NULL")
+                for row in rows:
+                    await websocket.send(json.dumps(row))
+                    
+            self.connected_frontend[websocket] = len(self.connected_frontend.keys()) + 1
+            self.send_message(websocket, "All data sent, the server is now listening for updates...")
+            logger.info("Data sent")
 
-        # Step 3: Await for frontend updates
-        async for message in websocket:
-            data = json.loads(message)
-            if 'time_end' in data:
-                async with self.db_pool.acquire() as conn:
-                    await conn.execute("UPDATE ALERTS SET time_end = $1 WHERE geofence = $2", data['time_end'], data['geofence'])
-                await self.kafka_producer.send('alert-updates', value=data)
+            # Step 2: Listen for updates from Kafka
+            async for message in self.kafka_consumer:
+                if message.key != self.connected_frontend[websocket] and message.topic != 'users-in-danger':
+                    await websocket.send(json.dumps(message.value))
 
-            elif 'geofence' in data:
-                # Update the alerts table
-                async with self.db_pool.acquire() as conn:
-                    await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), $2, $3)",
-                                       data['geofence'], data['time_start'], data['description'])
-                
-                #TODO: Create function to check users is in danger
-                
-                await self.kafka_producer.send('alert-updates', value=data)
+            # Step 3: Await for frontend updates
+            async for message in websocket:
+                data = json.loads(message)
+                if 'time_end' in data:
+                    async with self.db_pool.acquire() as conn:
+                        await conn.execute("UPDATE ALERTS SET time_end = $1 WHERE geofence = $2", data['time_end'], data['geofence'])
+                    await self.kafka_producer.send('alert-updates', value=data)
 
-    # TODO
+                elif 'geofence' in data:
+                    # Update the alerts table
+                    async with self.db_pool.acquire() as conn:
+                        await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), $2, $3)",
+                                        data['geofence'], data['time_start'], data['description'])
+                    
+                    # Check if there are users in danger
+                    await self.check_users_in_danger(data['geofence'], data['messages'])
+                    await self.kafka_producer.send('alert-updates', value=data)
+        finally:
+            logger.info("Frontend disconnected")
+
     async def kafka_listener(self):
-        pass
+        try:
+            async for message in self.kafka_consumer:
+                if message.topic == 'users-in-danger':
+                    if message.key in self.connected_mobile:
+                        await self.send_message(self.connected_mobile[message.key], message.value)
+        except Exception as e:
+            logger.error(f"Error in Kafka listener: {str(e)}")
 
     async def run(self, host, port):
         await self.connect_to_db()
         await self.subscribe_to_kafka_topic()
 
-        asyncio.create_task(self.kafka_listener())
+        print(self.db_pool)
+
+        #await asyncio.create_task(self.kafka_listener())
 
         server_mobile = await websockets.serve(self.handle_mobile, host, port)
-        server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
+        #server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
 
         await server_mobile.wait_closed()
-        await server_frontend.wait_closed()
+        #await server_frontend.wait_closed()
 
 if __name__ == "__main__":
     server = WebSocketServer()
