@@ -29,7 +29,7 @@ class WebSocketServer:
 
     async def connect_to_db(self):
         logger.info("Connecting to database...")
-        self.conn = await asyncpg.create_pool(**DB_CONFIG)
+        self.db_pool = await asyncpg.create_pool(**DB_CONFIG)
         logger.info("Connected to database")
 
     async def subscribe_to_kafka_topic(self):
@@ -212,15 +212,13 @@ class WebSocketServer:
         await self.connect_to_db()
         await self.subscribe_to_kafka_topic()
 
-        print(self.db_pool)
-
-        #await asyncio.create_task(self.kafka_listener())
+        await asyncio.create_task(self.kafka_listener())
 
         server_mobile = await websockets.serve(self.handle_mobile, host, port)
-        #server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
+        server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
 
         await server_mobile.wait_closed()
-        #await server_frontend.wait_closed()
+        await server_frontend.wait_closed()
 
 if __name__ == "__main__":
     server = WebSocketServer()
