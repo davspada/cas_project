@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Safety Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 60vh;
+      width: 100%;
+    }
+    .info-table {
+      height: 40vh;
+      width: 100%;
+      overflow-y: auto;
+      border-collapse: collapse;
+    }
+    .info-table th, .info-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    .info-table th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <table class="info-table">
+    <thead>
+      <tr>
+        <th>User Code</th>
+        <th>Latitude</th>
+        <th>Longitude</th>
+        <th>Transport Method</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="user-table-body"></tbody>
+  </table>
+
+  <table class="info-table">
+    <thead>
+      <tr>
+        <th>Geofence</th>
+        <th>Start Time</th>
+        <th>Description</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="alert-table-body"></tbody>
+  </table>
+
+  <script>
+    // Initialize the map
+    var map = L.map('map').setView([0, 0], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // WebSocket connection
+    var socket = new WebSocket('ws://localhost:8081');
+
+    // User table and marker management
+    var userMarkers = {};
+
+    socket.onmessage = function(event) {
+      var data = JSON.parse(event.data);
+      if (data.code) {
+        // User data update
+        updateUserTable(data);
+        updateUserMarker(data);
+      } else {
+        // Geofence alert update
+        updateAlertTable(data);
+      }
+    };
+
+    function updateUserTable(userData) {
+      var userRow = document.getElementById(`user-row-${userData.code}`);
+      if (userRow) {
+        userRow.cells[1].textContent = userData.position.lat;
+        userRow.cells[2].textContent = userData.position.lon;
+        userRow.cells[3].textContent = userData.transport_method;
+        userRow.cells[4].textContent = 'Active';
+      } else {
+        var newRow = document.createElement('tr');
+        newRow.id = `user-row-${userData.code}`;
+        newRow.innerHTML = `
+          <td>${userData.code}</td>
+          <td>${userData.position.lat}</td>
+          <td>${userData.position.lon}</td>
+          <td>${userData.transport_method}</td>
+          <td>Active</td>
+        `;
+        document.getElementById('user-table-body').appendChild(newRow);
+      }
+    }
+
+    function updateUserMarker(userData) {
+      if (userMarkers[userData.code]) {
+        userMarkers[userData.code].setLatLng([userData.position.lat, userData.position.lon]);
+      } else {
+        var icon = L.icon({
+          iconUrl: `https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-${userData.transport_method}.png`,
+          iconSize: [25, 41],
+          iconAnchor: [12, 41]
+        });
+        var marker = L.marker([userData.position.lat, userData.position.lon], { icon: icon }).addTo(map);
+        userMarkers[userData.code] = marker;
+      }
+    }
+
+    // Geofence alert table management
+    var alertMarkers = {};
+
+    function updateAlertTable(alertData) {
+      var alertRow = document.getElementById(`alert-row-${alertData.geofence}`);
+      if (alertRow) {
+        alertRow.cells[3].textContent = 'Active';
+      } else {
+        var newRow = document.createElement('tr');
+        newRow.id = `alert-row-${alertData.geofence}`;
+        newRow.innerHTML = `
+          <td>${alertData.geofence}</td>
+          <td>${alertData.time_start}</td>
+          <td>${alertData.description}</td>
+          <td>Active</td>
+        `;
+        document.getElementById('alert-table-body').appendChild(newRow);
+
+        // Add geofence polygon to the map
+        var polygon = L.polygon(JSON.parse(alertData.geofence), {
+          color: 'red',
+          fillColor: '#f03',
+          fillOpacity: 0.5
+        }).addTo(map);
+        alertMarkers[alertData.geofence] = polygon;
+      }
+    }
+  </script>
+</body>
+</html>
