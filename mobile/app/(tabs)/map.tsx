@@ -9,6 +9,8 @@ const MapScreen = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let subscription;
+
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
@@ -18,10 +20,27 @@ const MapScreen = () => {
                 return;
             }
 
+            // Get initial location
             let loc = await Location.getCurrentPositionAsync({});
             setLocation(loc.coords);
             setLoading(false);
+
+            // Watch for location changes
+            subscription = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.High,
+                    timeInterval: 1000, // Update every 1 second
+                    distanceInterval: 1, // Update when user moves at least 1 meter
+                },
+                (loc) => {
+                    setLocation(loc.coords);
+                }
+            );
         })();
+
+        return () => {
+            if (subscription) subscription.remove();
+        };
     }, []);
 
     return (
@@ -35,6 +54,12 @@ const MapScreen = () => {
                     initialRegion={{
                         latitude: location ? location.latitude : 44.494887,
                         longitude: location ? location.longitude : 11.342616,
+                        latitudeDelta: 0.0922,
+                        longitudeDelta: 0.0421,
+                    }}
+                    region={location && {
+                        latitude: location.latitude,
+                        longitude: location.longitude,
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421,
                     }}
