@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 const MapScreen = () => {
     const [location, setLocation] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         let subscription;

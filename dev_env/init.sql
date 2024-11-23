@@ -2,6 +2,7 @@
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     code VARCHAR(10), --NOT NULL
+    token VARCHAR,
     connected BOOLEAN NOT NULL DEFAULT FALSE,
     location GEOMETRY(Point, 4326),
     transportation_mode VARCHAR(10) CHECK (transportation_mode IN ('car', 'walking'))

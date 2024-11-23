@@ -4,11 +4,13 @@ import React from 'react';
 import { TabBarIcon } from '@/components/navigation/TabBarIcon';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { WebSocketProvider } from '@/contexts/WebSocketProvider';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
+    <WebSocketProvider url='ws://10.0.2.2:8080'>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
@@ -41,6 +43,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="socket_test"
+        options={{
+          title: 'socket',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'map' : 'map-outline'} color={color} />
+          ),
+        }}
+      />
     </Tabs>
+    </WebSocketProvider>
   );
 }
