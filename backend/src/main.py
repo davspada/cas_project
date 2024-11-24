@@ -149,8 +149,8 @@ class WebSocketServer:
 
             async with self.db_pool.acquire() as conn:
                 rows = await conn.fetch("SELECT code, position, transport_method FROM USERS WHERE connected = true AND position IS NOT NULL AND transport_method IS NOT NULL")
-                for row in rows:
-                    await websocket.send(json.dumps(dict(row)))
+                
+                await websocket.send(json.dumps(dict(rows)))
 
             self.connected_frontend[websocket] = len(self.connected_frontend) + 1
             # await self.send_message(websocket, "All data sent, the server is now listening for updates...")
