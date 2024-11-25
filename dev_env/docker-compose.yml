@@ -24,16 +24,16 @@ services:
      networks:
        - cas-network
   
-  express-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - 3001:3001
-    depends_on:
-      - cas-db
-    networks:
-      - cas-network
+  # express-app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - 3001:3001
+  #   depends_on:
+  #     - cas-db
+  #   networks:
+  #     - cas-network
 
   zookeeper:
     image: confluentinc/cp-zookeeper

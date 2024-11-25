@@ -13,13 +13,13 @@ const Tab1: React.FC = () => {
     setMessages((prev) => [...prev, data as Message]);
   });
 
-  const sendMessage = (): void => {
-    websocket.sendMessage({ code: 'test1'});
+  const connect_to_backend = (): void => {
+    websocket.sendMessage({ code: 'test1', token : '325a46d0749f7d6b607ecf3739c4734f' });
   };
 
   return (
     <View style={styles.container}>
-      <Button title="Send WebSocket Message" onPress={sendMessage} />
+      <Button title="Send WebSocket Message" onPress={connect_to_backend} />
       <Text>Messages:</Text>
       {messages.map((msg, index) => (
         <Text key={index}>{msg.content}</Text>

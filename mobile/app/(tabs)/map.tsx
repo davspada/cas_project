@@ -2,11 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import useWebSocket from '@/hooks/useWebSocket';
+
+interface Message {
+    type: string;
+    content: string;
+}
+
+interface location_type{
+    lat: any;
+    lon: any;
+}
 
 const MapScreen = () => {
-    const [location, setLocation] = useState(null);
+    const [location, setLocation] = useState<location_type | null>(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([]);  // This line is not present in the original file
+    const websocket = useWebSocket((data) => {  // This line is not present in the original file
+        setMessages((prev) => [...prev, data as Message]);  // This line is not present in the original file
+    });
+
+    const send_location = (): void =>{
+        websocket.sendMessage({ code: 'test1', position: location });
+        console.log("Location:"+location.latitude + location.longitude +" updated and sent to backend");
+    }
 
     useEffect(() => {
         let subscription;
@@ -22,7 +42,7 @@ const MapScreen = () => {
 
             // Get initial location
             let loc = await Location.getCurrentPositionAsync({});
-            setLocation(loc.coords);
+            setLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
             setLoading(false);
 
             // Watch for location changes
@@ -33,7 +53,11 @@ const MapScreen = () => {
                     distanceInterval: 1, // Update when user moves at least 1 meter
                 },
                 (loc) => {
-                    setLocation(loc.coords);
+                    const newLocation = { lat: loc.coords.latitude, lon: loc.coords.longitude };
+                    setLocation(newLocation);
+                    console.log(newLocation)
+                    //console.log("location about to send = " + newLocation.lat + ", " + newLocation.lon);
+                    websocket.sendMessage({ code: 'test1', position: newLocation });
                 }
             );
         })();
@@ -52,21 +76,21 @@ const MapScreen = () => {
                     provider={PROVIDER_GOOGLE}
                     style={styles.map}
                     initialRegion={{
-                        latitude: location ? location.latitude : 44.494887,
-                        longitude: location ? location.longitude : 11.342616,
+                        latitude: location ? location.lat : 44.494887,
+                        longitude: location ? location.lon : 11.342616,
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421,
                     }}
                     region={location && {
-                        latitude: location.latitude,
-                        longitude: location.longitude,
+                        latitude: location.lat,
+                        longitude: location.lon,
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421,
                     }}
                 >
                     {location && (
                         <Marker
-                            coordinate={{ latitude: location.latitude, longitude: location.longitude }}
+                            coordinate={{ latitude: location.lat, longitude: location.lon }}
                             title={"Your Location"}
                             description={"This is where you are"}
                         />
