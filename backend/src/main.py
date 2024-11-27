@@ -149,7 +149,7 @@ class WebSocketServer:
 
             async with self.db_pool.acquire() as conn:
                 users_query = """
-                    SELECT code, position, transport_method 
+                    SELECT code, ST_AsGeoJSON("position"), transport_method 
                     FROM USERS 
                     WHERE connected = true 
                     AND position IS NOT NULL 
@@ -158,7 +158,7 @@ class WebSocketServer:
                 users = await conn.fetch(users_query)
 
                 alerts_query = """
-                    SELECT geofence, time_start, description 
+                    SELECT ST_AsGeoJSON("geofence"), time_start, description 
                     FROM ALERTS 
                     WHERE time_end IS NULL
                 """
