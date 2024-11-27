@@ -1,5 +1,6 @@
 import asyncio
 import asyncpg
+from datetime import datetime
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
@@ -35,7 +36,7 @@ class WebSocketServer:
             self.db_pool = await asyncpg.create_pool(**DB_CONFIG)
             logger.info("Connected to database")
         except Exception as e:
-            logger.error(f"Failed to connect to the database: {e}")
+            logger.exception(f"Failed to connect to the database")
             raise
 
     async def start_kafka(self):
@@ -57,7 +58,7 @@ class WebSocketServer:
 
             logger.info("Kafka consumer and producer started successfully")
         except Exception as e:
-            logger.error(f"Failed to start Kafka services: {e}")
+            logger.exception(f"Failed to start Kafka services")
             raise
 
     async def stop_kafka(self):
@@ -71,19 +72,19 @@ class WebSocketServer:
         try:
             await websocket.send(json.dumps(message))
         except Exception as e:
-            logger.error(f"Failed to send message: {e}")
+            logger.exception(f"Failed to send message to websocket")
 
     async def update_location(self, code, position):
         try:
             async with self.db_pool.acquire() as conn:
                 await conn.execute(
                     "UPDATE USERS SET position = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE code = $3",
-                    position['lat'], position['lon'], code
+                    position['lon'], position['lat'], code
                 )
             #await self.send_message(self.connected_mobile[code], "Position updated")
             logger.info(f"User {code} updated position")
         except Exception as e:
-            logger.error(f"Error updating position for user {code}: {str(e)}")
+            logger.exception(f"Error updating position for user {code}")
 
     async def update_transport_method(self, code, transport_method):
         try:
@@ -92,7 +93,7 @@ class WebSocketServer:
             # await self.send_message(self.connected_mobile[code], "Transport method updated")
             logger.info(f"User {code} updated transport method")
         except Exception as e:
-            logger.error(f"Error updating transport method for user {code}: {str(e)}")
+            logger.exception(f"Error updating transport method for user {code}")
 
     async def handle_mobile(self, websocket, path):
         code = None
@@ -134,7 +135,7 @@ class WebSocketServer:
                 await self.kafka_producer.send('user-updates', key=code.encode('utf-8'), value=data)
 
         except Exception as e:
-            logger.error(f"Error handling mobile connection for user {code}: {str(e)}")
+            logger.exception(f"Error handling mobile connection for user {code}")
         finally:
             if code in self.connected_mobile:
                 del self.connected_mobile[code]
@@ -144,16 +145,45 @@ class WebSocketServer:
 
     async def handle_frontend(self, websocket, path):
         try:
-            logger.info("Frontend connected")
-            # await self.send_message(websocket, f"Connected to server {self.name}, all data from database is coming...")
+            logger.info(f"Frontend {len(self.connected_frontend)} connected, sending all data...")
 
             async with self.db_pool.acquire() as conn:
-                rows = await conn.fetch("SELECT code, position, transport_method FROM USERS WHERE connected = true AND position IS NOT NULL AND transport_method IS NOT NULL")
-                
-                await websocket.send(json.dumps(dict(rows)))
+                users_query = """
+                    SELECT code, position, transport_method 
+                    FROM USERS 
+                    WHERE connected = true 
+                    AND position IS NOT NULL 
+                    AND transport_method IS NOT NULL
+                """
+                users = await conn.fetch(users_query)
 
-            self.connected_frontend[websocket] = len(self.connected_frontend) + 1
-            # await self.send_message(websocket, "All data sent, the server is now listening for updates...")
+                alerts_query = """
+                    SELECT geofence, time_start, description 
+                    FROM ALERTS 
+                    WHERE time_end IS NULL
+                """
+                alerts = await conn.fetch(alerts_query)
+
+                def serialize_data(item):
+                    if isinstance(item, datetime):
+                        return item.isoformat()
+                    return item
+
+                response = {
+                    "users": [
+                        {key: serialize_data(value) for key, value in dict(row).items()} 
+                        for row in users
+                    ],
+                    "alerts": [
+                        {key: serialize_data(value) for key, value in dict(row).items()} 
+                        for row in alerts
+                    ],
+                }
+
+                await websocket.send(json.dumps(response))
+
+            self.connected_frontend[websocket] = len(self.connected_frontend)
+            logger.info(f"All data sent to frontend {self.connected_frontend[websocket]}, listening for updates...")
 
             async for message in self.kafka_consumer:
                 if message.topic != 'users-in-danger' and websocket in self.connected_frontend:
@@ -170,7 +200,7 @@ class WebSocketServer:
                         await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), $2, $3)", data['geofence'], data['time_start'], data['description'])
                     await self.kafka_producer.send('alert-updates', value=data)
         except Exception as e:
-            logger.error(f"Error handling frontend connection: {str(e)}")
+            logger.exception(f"Error handling frontend connection")
         finally:
             logger.info("Frontend disconnected")
 
@@ -180,7 +210,7 @@ class WebSocketServer:
                 if message.topic == 'users-in-danger' and message.key in self.connected_mobile:
                     await self.send_message(self.connected_mobile[message.key], message.value)
         except Exception as e:
-            logger.error(f"Error in Kafka listener: {str(e)}")
+            logger.exception(f"Error in Kafka listener")
 
     async def run(self, host, port):
         try:
@@ -194,7 +224,7 @@ class WebSocketServer:
 
             await asyncio.gather(server_mobile.wait_closed(), server_frontend.wait_closed(), kafka_task)
         except Exception as e:
-            logger.error(f"Error running the WebSocket server: {str(e)}")
+            logger.exception(f"Error running the WebSocket server")
         finally:
             await self.stop_kafka()
             if self.db_pool:
