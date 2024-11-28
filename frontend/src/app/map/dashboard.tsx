@@ -7,6 +7,7 @@ import { useWebSocket } from '@/contexts/WebSocketProvider';
 const Dashboard = () => {
   const [mobilityFilter, setMobilityFilter] = useState('all');
   const [userPositions, setUserPositions] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [numClusters, setNumClusters] = useState(1);
   const [clusteringMode, setClusteringMode] = useState('automatic');
   const [showGeofences, setShowGeofences] = useState(true);
@@ -16,6 +17,26 @@ const Dashboard = () => {
   const { sendMessage, isConnected, latestMessage } = useWebSocket();
 
   // Handle incoming WebSocket messages
+  // useEffect(() => {
+  //   if (latestMessage) {
+  //     console.log('New data from WebSocket:', latestMessage);
+  
+  //     // Transform the user data
+  //     const transformedUserPositions = latestMessage.users.map((user: any) => ({
+  //       type: 'Feature',
+  //       geometry: JSON.parse(user.st_asgeojson),
+  //       properties: {
+  //         id: user.code, // Use `code` as the unique identifier
+  //         transportation_mode: user.transport_method,
+  //       },
+  //     }));
+  
+  //     setUserPositions(transformedUserPositions);
+  //     console.log('Transformed user positions:', transformedUserPositions);
+  //   }
+  // }, [latestMessage]);
+  
+
   useEffect(() => {
     if (latestMessage) {
       console.log('New data from WebSocket:', latestMessage);
@@ -32,6 +53,19 @@ const Dashboard = () => {
   
       setUserPositions(transformedUserPositions);
       console.log('Transformed user positions:', transformedUserPositions);
+
+      // Transform the alert data
+      const transformedAlerts = latestMessage.alerts.map((alert: any) => ({
+        type: 'Feature',
+        geometry: JSON.parse(alert.st_asgeojson),
+        properties: {
+          time_start: alert.time_start,
+          description: alert.description,
+        },
+      }));
+
+      setAlerts(transformedAlerts);
+      console.log('Transformed alerts:', transformedAlerts[0]);
     }
   }, [latestMessage]);
   
@@ -83,6 +117,7 @@ const Dashboard = () => {
       {userPositions.length > 0 ? (
         <MapContainer
           userPositions={userPositions}
+          mapalerts={alerts}
           mobilityFilter={mobilityFilter}
           numClusters={numClusters}
           clusteringMode={clusteringMode}

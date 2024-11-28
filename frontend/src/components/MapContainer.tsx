@@ -10,19 +10,20 @@ import Point from 'ol/geom/Point';
 import { fromLonLat } from 'ol/proj';
 import { Circle as CircleStyle, Fill, Style } from 'ol/style';
 import { kMeansClustering } from '@/utils/kMeans';
-import { UserPosition } from '@/types';
+import { Alert, UserPosition } from '@/types';
 import VectorSource from 'ol/source/Vector';
 import useUserMarkers from '@/hooks/useUserMarkers';
 import useGeofences from '@/hooks/useGeofences';
 
 interface MapContainerProps {
   userPositions: UserPosition[];
+  mapalerts: Alert[]
   mobilityFilter: string;
   numClusters: number;
   clusteringMode: string;
 }
 
-const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilter, numClusters, clusteringMode }) => {
+const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, mobilityFilter, numClusters, clusteringMode }) => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const userMarkersLayerRef = useRef<VectorLayer | null>(null);
@@ -34,7 +35,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   // Custom hook for managing geofence layer and interactions
   const { geofenceLayer, addInteraction, toggleEditing, isEditing, disableSelectInteraction, enableHoverPreview, enableClickSelection } = useGeofences({
     mapInstance: mapInstanceRef.current,
-    alerts: null, // Pass alerts data here if needed
+    alerts: mapalerts, // Pass alerts data here if needed
   });
 
   // Filter user positions based on mobility filter

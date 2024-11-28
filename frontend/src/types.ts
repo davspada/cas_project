@@ -14,12 +14,17 @@ export interface UserPosition {
   
 
 export interface Alert {
-      id: number;
-      geofence: Geometry; // Using OpenLayers Geometry type
-      time_start: string; // ISO timestamp string
-      time_end?: string; // Optional ISO timestamp string
-      description?: string; // Optional text
+  type: 'Feature';
+  geometry: {
+    type: 'Polygon';
+    coordinates: [];
+  };
+  properties: {
+    time_start: string;
+    description: string;
+  };
 }
+
   
 export interface User {
       id: number;
