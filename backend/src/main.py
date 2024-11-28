@@ -16,7 +16,7 @@ DB_CONFIG = {
     "password": "password"
 }
 
-KAFKA_HOST = 'localhost'
+KAFKA_HOST = 'localhost:9092'
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,14 +44,14 @@ class WebSocketServer:
             logger.info("Starting Kafka consumer and producer...")
             self.kafka_consumer = AIOKafkaConsumer(
                 'alert-updates', 'user-updates', 'users-in-danger',
-                bootstrap_servers=f'{KAFKA_HOST}:9092',
+                bootstrap_servers=f'{KAFKA_HOST}',
                 auto_offset_reset='latest',
                 value_deserializer=lambda v: json.loads(v.decode('utf-8'))
             )
             await self.kafka_consumer.start()
 
             self.kafka_producer = AIOKafkaProducer(
-                bootstrap_servers=f'{KAFKA_HOST}:9092',
+                bootstrap_servers=f'{KAFKA_HOST}',
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
             await self.kafka_producer.start()
