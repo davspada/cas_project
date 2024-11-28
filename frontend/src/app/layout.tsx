@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { WebSocketProvider } from "@/contexts/WebSocketProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,8 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <WebSocketProvider url="ws://localhost:8081">
     <html lang="en">
       <body className={inter.className}>{children}</body>
     </html>
+    </WebSocketProvider>
   );
 }

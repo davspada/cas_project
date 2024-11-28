@@ -45,6 +45,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mobilityFilt
   // Determine cluster count based on mode and zoom level
   const autoClusterCount = Math.max(2, Math.min(10, Math.floor(zoomLevel / 2)));
   const actualClusterCount = clusteringMode === 'manual' ? numClusters : autoClusterCount;
+  //console.log("filteredpos: "+filteredPositions)
   const clusters = kMeansClustering(filteredPositions, actualClusterCount);
 
   // Convert clusters into OpenLayers features

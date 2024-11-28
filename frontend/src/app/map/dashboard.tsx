@@ -2,30 +2,45 @@
 import { useState, useEffect } from 'react';
 import MapContainer from '@/components/MapContainer';
 import { LoadingSpinner } from '@/components/loading_spinner';
+import { useWebSocket } from '@/contexts/WebSocketProvider';
 
 const Dashboard = () => {
   const [mobilityFilter, setMobilityFilter] = useState('all');
   const [userPositions, setUserPositions] = useState([]);
   const [numClusters, setNumClusters] = useState(1);
-  const [clusteringMode, setClusteringMode] = useState('automatic'); // New state for clustering mode
-  const [showGeofences, setShowGeofences] = useState(true); // Toggle for geofence visibility
-  const [drawingMode, setDrawingMode] = useState<null | 'Polygon' | 'Circle'>(null); // Drawing mode for geofences
-  const [isEditingGeofences, setIsEditingGeofences] = useState(false); // Toggle for geofence editing
+  const [clusteringMode, setClusteringMode] = useState('automatic');
+  const [showGeofences, setShowGeofences] = useState(true);
+  const [drawingMode, setDrawingMode] = useState<null | 'Polygon' | 'Circle'>(null);
+  const [isEditingGeofences, setIsEditingGeofences] = useState(false);
 
-  // Fetch user data from API
+  const { sendMessage, isConnected, latestMessage } = useWebSocket();
+
+  // Handle incoming WebSocket messages
   useEffect(() => {
-    const fetchUserPositions = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/users'); // Adjust API endpoint
-        const data = await response.json();
-        setUserPositions(data.features); // Assuming GeoJSON structure
-      } catch (error) {
-        console.error('Error fetching user positions:', error);
-      }
-    };
-    
-    fetchUserPositions();
-  }, []);
+    if (latestMessage) {
+      console.log('New data from WebSocket:', latestMessage);
+  
+      // Transform the user data
+      const transformedUserPositions = latestMessage.users.map((user: any) => ({
+        type: 'Feature',
+        geometry: JSON.parse(user.st_asgeojson),
+        properties: {
+          id: user.code, // Use `code` as the unique identifier
+          transportation_mode: user.transport_method,
+        },
+      }));
+  
+      setUserPositions(transformedUserPositions);
+      console.log('Transformed user positions:', transformedUserPositions);
+    }
+  }, [latestMessage]);
+  
+
+  useEffect(() => {
+    if (isConnected) {
+      sendMessage(JSON.stringify({ type: 'init', payload: 'Dashboard connected' }));
+    }
+  }, [isConnected, sendMessage]);
 
   return (
     <div>
@@ -50,45 +65,31 @@ const Dashboard = () => {
         </select>
       </div>
 
-      {/* Cluster Number Slider - Show only if manual mode is selected */}
+      {/* Cluster Number Slider */}
       {clusteringMode === 'manual' && (
         <div>
           <label>Number of Clusters: {numClusters}</label>
-          <input 
-            type="range" 
-            min="1" 
-            max="10" 
-            value={numClusters} 
-            onChange={(e) => setNumClusters(Number(e.target.value))} 
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={numClusters}
+            onChange={(e) => setNumClusters(Number(e.target.value))}
           />
         </div>
       )}
 
-      {/* Geofence Controls 
-      <div>
-        <label>Geofences:</label>
-        <button onClick={() => setShowGeofences(!showGeofences)}>
-          {showGeofences ? 'Hide Geofences' : 'Show Geofences'}
-        </button>
-        <button onClick={() => setDrawingMode('Polygon')}>Draw Polygon</button>
-        <button onClick={() => setDrawingMode('Circle')}>Draw Circle</button>
-        <button onClick={() => setIsEditingGeofences(!isEditingGeofences)}>
-          {isEditingGeofences ? 'Disable Editing' : 'Enable Editing'}
-        </button>
-      </div>
-      */}
-
-      {/* Only render MapContainer when userPositions is not empty */}
+      {/* Map Container */}
       {userPositions.length > 0 ? (
-        <MapContainer 
-          userPositions={userPositions} 
-          mobilityFilter={mobilityFilter} 
-          numClusters={numClusters} 
-          clusteringMode={clusteringMode} // Pass clusteringMode to MapContainer
-          showGeofences={showGeofences} // Pass geofence toggle
-          drawingMode={drawingMode} // Pass drawing mode for geofences
-          isEditingGeofences={isEditingGeofences} // Pass editing mode for geofences
-          onDrawingModeChange={setDrawingMode} // Reset drawing mode after drawing
+        <MapContainer
+          userPositions={userPositions}
+          mobilityFilter={mobilityFilter}
+          numClusters={numClusters}
+          clusteringMode={clusteringMode}
+          showGeofences={showGeofences}
+          drawingMode={drawingMode}
+          isEditingGeofences={isEditingGeofences}
+          onDrawingModeChange={setDrawingMode}
         />
       ) : (
         <LoadingSpinner />

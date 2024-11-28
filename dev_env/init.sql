@@ -5,7 +5,7 @@ CREATE TABLE users (
     token VARCHAR,
     connected BOOLEAN NOT NULL DEFAULT FALSE,
     position GEOMETRY(Point, 4326),
-    transportation_mode VARCHAR(10) CHECK (transportation_mode IN ('car', 'walking'))
+    transport_method VARCHAR(10) CHECK (transport_method IN ('car', 'walking'))
 );
 
 CREATE TABLE alerts (
@@ -16,7 +16,7 @@ CREATE TABLE alerts (
     description text
 );
 -- Insert sample users with location in Bologna, Italy
-INSERT INTO users (location, transportation_mode)
+INSERT INTO users (position, transport_method)
 VALUES
     (ST_SetSRID(ST_MakePoint(11.3426, 44.4949), 4326), 'walking'), -- User 1
     (ST_SetSRID(ST_MakePoint(11.3430, 44.4955), 4326), 'walking'), -- User 2

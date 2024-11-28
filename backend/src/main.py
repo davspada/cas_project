@@ -11,9 +11,9 @@ from typing import Dict
 # Database connection details
 DB_CONFIG = {
     "host": "localhost",
-    "database": "cas_db",
-    "user": "cas",
-    "password": "pw"
+    "database": "mydb",
+    "user": "postgis",
+    "password": "password"
 }
 
 KAFKA_HOST = 'localhost'

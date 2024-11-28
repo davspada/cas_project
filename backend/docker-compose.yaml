@@ -58,6 +58,14 @@ services:
       JVM_OPTS: "-Xms32M -Xmx64M"
     command: ["--server.port=9000"]
 
+  pgadmin:
+     image: dpage/pgadmin4:latest
+     ports:
+       - 5050:80
+     environment:
+       - PGADMIN_DEFAULT_EMAIL=admin@example.com
+       - PGADMIN_DEFAULT_PASSWORD=admin
+
 volumes:
   postgis_data:
   kafka_data:
