@@ -11,6 +11,7 @@ import { Alert } from '@/types';
 import { transform } from 'ol/proj';
 import { useWebSocket } from '@/contexts/WebSocketProvider';
 import { ensureRightHandRule } from '@/utils/mapUtils';
+import Swal from 'sweetalert2';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
@@ -162,26 +163,56 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                 setSnapInteraction(snap);
 
                 draw.on('drawend', (event) => {
-                    const newFeature = event.feature;
+                    Swal.fire({
+                        title: "Insert the alert description below",
+                        input: "text",
+                        inputAttributes: {
+                          autocapitalize: "off"
+                        },
+                        showCancelButton: true,
+                        confirmButtonText: "Insert",
+                        showLoaderOnConfirm: true,
+                        preConfirm: async (alert_description) => {
+                          if (!alert_description) {
+                            Swal.showValidationMessage('Description is required');
+                            return false;
+                          }
+                          return alert_description;
+                        },
+                        allowOutsideClick: () => !Swal.isLoading()
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                            const newFeature = event.feature;
 
-                    // Step 1: Clone geometry and transform it to EPSG:4326 (WGS 84) from EPSG:3857 (Web Mercator)
-                    const transformedGeometry = newFeature
-                        .getGeometry()
-                        ?.clone()
-                        .transform('EPSG:3857', 'EPSG:4326'); // Transform the geometry
-                
-                    // Step 2: Use WKT format to convert the geometry to Well-Known Text
-                    const wktFormat = new WKT();
-                    const wktString = wktFormat.writeGeometry(transformedGeometry);
-                    // Step 3: Create the newAlert object
-                    const newAlert = {
-                        geofence: wktString, // Directly use the GeoJSON object (no stringification here)
-                        time_start: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
-                        description: "High alert in zone A", // Customize as needed
-                    };
-                
-                    // Send the message via WebSocket (send the newAlert as a stringified object)
-                    sendMessage(JSON.stringify(newAlert));
+                            // Step 1: Clone geometry and transform it to EPSG:4326 (WGS 84) from EPSG:3857 (Web Mercator)
+                            const transformedGeometry = newFeature
+                                .getGeometry()
+                                ?.clone()
+                                .transform('EPSG:3857', 'EPSG:4326'); // Transform the geometry
+                        
+                            // Step 2: Use WKT format to convert the geometry to Well-Known Text
+                            const wktFormat = new WKT();
+                            const wktString = wktFormat.writeGeometry(transformedGeometry);
+                            // Step 3: Create the newAlert object
+                            const newAlert = {
+                                geofence: wktString, // Directly use the GeoJSON object (no stringification here)
+                                time_start: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
+                                description: result.value, // Use the inserted description
+                            };
+                        
+                            // Send the message via WebSocket (send the newAlert as a stringified object)
+                            sendMessage(JSON.stringify(newAlert));
+                            Swal.fire({
+                                position: "top-end",
+                                icon: "success",
+                                title: "Alert saved",
+                                showConfirmButton: false,
+                                timer: 1500
+                              });
+                        } else {
+                            geofenceLayer.getSource()?.removeFeature(event.feature);
+                        }
+                      });
                 });
                 
             } else if (type === null) {
