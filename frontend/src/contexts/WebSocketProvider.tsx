@@ -47,6 +47,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
   const sendMessage = (message: string) => {
     if (wsRef.current && isConnected.current) {
       wsRef.current.send(message);
+      console.log("Message sent:", message);
     } else {
       console.warn("WebSocket is not connected");
     }

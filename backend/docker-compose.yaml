@@ -48,7 +48,7 @@ services:
     entrypoint: ["/bin/bash", "-c", "/etc/confluent/docker/run & sleep 10 && /usr/bin/create-topics.sh && wait"]
 
   kafdrop:
-    image: obsidiandynamics/kafdrop
+    image: obsidiandynamics/kafdrop:latest
     depends_on:
       - kafka
     ports:
@@ -57,14 +57,6 @@ services:
       KAFKA_BROKERCONNECT: kafka:9092
       JVM_OPTS: "-Xms32M -Xmx64M"
     command: ["--server.port=9000"]
-
-  pgadmin:
-     image: dpage/pgadmin4:latest
-     ports:
-       - 5050:80
-     environment:
-       - PGADMIN_DEFAULT_EMAIL=admin@example.com
-       - PGADMIN_DEFAULT_PASSWORD=admin
 
 volumes:
   postgis_data:

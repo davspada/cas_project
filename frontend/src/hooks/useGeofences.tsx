@@ -5,10 +5,12 @@ import { Draw, Modify, Select, Snap } from 'ol/interaction';
 import { Feature } from 'ol';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
-import { GeoJSON } from 'ol/format';
+import { GeoJSON, WKT } from 'ol/format';
 import { click, pointerMove } from 'ol/events/condition';
 import { Alert } from '@/types';
 import { transform } from 'ol/proj';
+import { useWebSocket } from '@/contexts/WebSocketProvider';
+import { ensureRightHandRule } from '@/utils/mapUtils';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
@@ -25,6 +27,8 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
     const [snapInteraction, setSnapInteraction] = useState<Snap | null>(null);
     const [hoverSelectInteraction, setHoverSelectInteraction] = useState<Select | null>(null);
     const [clickSelectInteraction, setClickSelectInteraction] = useState<Select | null>(null);
+
+    const { sendMessage, isConnected, latestMessage } = useWebSocket();
 
     useEffect(() => {
         if (!mapInstance) return;
@@ -58,12 +62,12 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                 const feature = new Feature({
                     geometry,
                 });
-                console.log('Transformed Alert Feature:', feature);
+                //console.log('Transformed Alert Feature:', feature);
                 return feature;
             });
             source.addFeatures(features);
             setGeofenceData(features);
-            console.log('Features added to the geofence layer:', source.getFeatures());
+            //console.log('Features added to the geofence layer:', source.getFeatures());
         }
 
         enableHoverPreview();
@@ -159,9 +163,27 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
 
                 draw.on('drawend', (event) => {
                     const newFeature = event.feature;
-                    setGeofenceData((prevData) => [...prevData, newFeature]);
-                    console.log('New geofence data:', newFeature.getGeometry()?.getCoordinates());
+
+                    // Step 1: Clone geometry and transform it to EPSG:4326 (WGS 84) from EPSG:3857 (Web Mercator)
+                    const transformedGeometry = newFeature
+                        .getGeometry()
+                        ?.clone()
+                        .transform('EPSG:3857', 'EPSG:4326'); // Transform the geometry
+                
+                    // Step 2: Use WKT format to convert the geometry to Well-Known Text
+                    const wktFormat = new WKT();
+                    const wktString = wktFormat.writeGeometry(transformedGeometry);
+                    // Step 3: Create the newAlert object
+                    const newAlert = {
+                        geofence: wktString, // Directly use the GeoJSON object (no stringification here)
+                        time_start: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
+                        description: "High alert in zone A", // Customize as needed
+                    };
+                
+                    // Send the message via WebSocket (send the newAlert as a stringified object)
+                    sendMessage(JSON.stringify(newAlert));
                 });
+                
             } else if (type === null) {
                 let drawInteractionInstance = undefined;
                 mapInstance.getInteractions().forEach((interaction) => {

@@ -1,6 +1,6 @@
 import asyncio
 import asyncpg
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
@@ -16,7 +16,7 @@ DB_CONFIG = {
     "password": "password"
 }
 
-KAFKA_HOST = 'localhost:9092'
+KAFKA_HOST = 'localhost'
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,14 +44,14 @@ class WebSocketServer:
             logger.info("Starting Kafka consumer and producer...")
             self.kafka_consumer = AIOKafkaConsumer(
                 'alert-updates', 'user-updates', 'users-in-danger',
-                bootstrap_servers=f'{KAFKA_HOST}',
+                bootstrap_servers=f'{KAFKA_HOST}:9092',
                 auto_offset_reset='latest',
                 value_deserializer=lambda v: json.loads(v.decode('utf-8'))
             )
             await self.kafka_consumer.start()
 
             self.kafka_producer = AIOKafkaProducer(
-                bootstrap_servers=f'{KAFKA_HOST}',
+                bootstrap_servers=f'{KAFKA_HOST}:9092',
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
             await self.kafka_producer.start()
@@ -144,6 +144,14 @@ class WebSocketServer:
                 logger.info(f"User {code} disconnected")
 
     async def handle_frontend(self, websocket, path):
+        async def kafka_handler():
+            try:
+                async for message in self.kafka_consumer:
+                    if message.topic != 'users-in-danger' and websocket in self.connected_frontend:
+                        await websocket.send(json.dumps(message.value))
+            except Exception as e:
+                logger.exception(f"Error in Kafka handler for frontend")
+
         try:
             logger.info(f"Frontend {len(self.connected_frontend)} connected, sending all data...")
 
@@ -185,24 +193,38 @@ class WebSocketServer:
             self.connected_frontend[websocket] = len(self.connected_frontend)
             logger.info(f"All data sent to frontend {self.connected_frontend[websocket]}, listening for updates...")
 
-            async for message in self.kafka_consumer:
-                if message.topic != 'users-in-danger' and websocket in self.connected_frontend:
-                    await websocket.send(json.dumps(message.value))
+            kafka_task = asyncio.create_task(kafka_handler())
 
             async for message in websocket:
                 data = json.loads(message)
                 if 'time_end' in data:
                     async with self.db_pool.acquire() as conn:
-                        await conn.execute("UPDATE ALERTS SET time_end = $1 WHERE geofence = $2", data['time_end'], data['geofence'])
+                        await conn.execute(
+                            "UPDATE ALERTS SET time_end = $1 WHERE geofence = $2",
+                            data['time_end'], data['geofence']
+                        )
                     await self.kafka_producer.send('alert-updates', value=data)
                 elif 'geofence' in data:
+                    try:
+                        formatted_date = datetime.fromisoformat(data['time_start'].replace("Z", "+00:00")).replace(tzinfo=None)
+                    except ValueError:
+                        logger.error(f"Invalid datetime format in time_start: {data['time_start']}")
+                        continue
+
                     async with self.db_pool.acquire() as conn:
-                        await conn.execute("INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), $2, $3)", data['geofence'], data['time_start'], data['description'])
+                        await conn.execute(
+                            "INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_GeomFromText($1, 4326), $2, $3)",
+                            data['geofence'], formatted_date, data['description']
+                        )
                     await self.kafka_producer.send('alert-updates', value=data)
+
         except Exception as e:
             logger.exception(f"Error handling frontend connection")
         finally:
+            if kafka_task:
+                kafka_task.cancel()
             logger.info("Frontend disconnected")
+
 
     async def kafka_listener(self):
         try:
