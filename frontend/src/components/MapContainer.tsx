@@ -145,33 +145,108 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
   };
 
   return (
-    <div>
-      <div ref={mapRef} style={{ width: '100%', height: '750px' }} />
-      <div className="controls">
+    <div style={{ position: "relative", height: "100%" }}>
+      {/* Map */}
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+  
+      {/* Controls */}
+      <div
+        className="controls"
+        style={{
+          position: "relative",
+          bottom: "10%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "inline-flex",
+          flexDirection: "row", // Horizontal layout
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "10px", // Space between buttons
+          background: "transparent", // Semi-transparent light gray
+          border: "2px ", // Black border
+          borderRadius: "12px",
+          padding: "10px",
+          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.2)",
+          zIndex: 1000,
+        }}
+      >
         <button
-          onClick={() => setDrawingType(drawingType === 'Polygon' ? null : 'Polygon')}
-          disabled={drawingType === 'Circle' || isEditing}
+          onClick={() => setDrawingType(drawingType === "Polygon" ? null : "Polygon")}
+          disabled={drawingType === "Circle" || isEditing}
+          style={{
+            padding: "10px 20px",
+            background: "#ffffff", // White button background
+            color: "black", // Black text
+            border: "1px solid black",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
         >
-          {drawingType === 'Polygon' ? 'Stop Drawing Polygon' : 'Draw Polygon'}
+          {drawingType === "Polygon" ? "Stop Drawing Polygon" : "Draw Polygon"}
         </button>
         <button
-          onClick={() => setDrawingType(drawingType === 'Circle' ? null : 'Circle')}
-          disabled={drawingType === 'Polygon' || isEditing}
+          onClick={() => setDrawingType(drawingType === "Circle" ? null : "Circle")}
+          disabled={drawingType === "Polygon" || isEditing}
+          style={{
+            padding: "10px 20px",
+            background: "#ffffff",
+            color: "black",
+            border: "1px solid black",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
         >
-          {drawingType === 'Circle' ? 'Stop Drawing Circle' : 'Draw Circle'}
+          {drawingType === "Circle" ? "Stop Drawing Circle" : "Draw Circle"}
         </button>
-        <button onClick={toggleEditing} disabled={drawingType != null}>
-          {isEditing ? 'Disable Editing' : 'Enable Editing'}
+        <button
+          onClick={toggleEditing}
+          disabled={drawingType != null}
+          style={{
+            padding: "10px 20px",
+            background: "#ffffff",
+            color: "black",
+            border: "1px solid black",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          {isEditing ? "Disable Editing" : "Enable Editing"}
         </button>
-        <button onClick={() => setShowGeofences(!showGeofences)}>
-          {showGeofences ? 'Hide Geofences' : 'Show Geofences'}
+        <button
+          onClick={() => setShowGeofences(!showGeofences)}
+          style={{
+            padding: "10px 20px",
+            background: "#ffffff",
+            color: "black",
+            border: "1px solid black",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          {showGeofences ? "Hide Geofences" : "Show Geofences"}
         </button>
-        <button onClick={handleToggleSelect} disabled={drawingType != null || isEditing}>
-          {isSelecting ? 'Disable Selection' : 'Enable Selection'}
+        <button
+          onClick={handleToggleSelect}
+          disabled={drawingType != null || isEditing}
+          style={{
+            padding: "10px 20px",
+            background: "#ffffff",
+            color: "black",
+            border: "1px solid black",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          {isSelecting ? "Disable Selection" : "Enable Selection"}
         </button>
       </div>
     </div>
-  );
+  );  
 };
 
 export default MapContainer;

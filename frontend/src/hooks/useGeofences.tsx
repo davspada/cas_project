@@ -63,12 +63,10 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                 const feature = new Feature({
                     geometry,
                 });
-                //console.log('Transformed Alert Feature:', feature);
                 return feature;
             });
             source.addFeatures(features);
             setGeofenceData(features);
-            //console.log('Features added to the geofence layer:', source.getFeatures());
         }
 
         enableHoverPreview();
