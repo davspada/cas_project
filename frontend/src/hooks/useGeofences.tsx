@@ -8,10 +8,10 @@ import { Map } from 'ol';
 import { GeoJSON, WKT } from 'ol/format';
 import { click, pointerMove } from 'ol/events/condition';
 import { Alert } from '@/types';
-import { transform } from 'ol/proj';
 import { useWebSocket } from '@/contexts/WebSocketProvider';
-import { ensureRightHandRule } from '@/utils/mapUtils';
 import Swal from 'sweetalert2';
+import { fromLonLat } from 'ol/proj';
+import { Color } from 'ol/color';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
@@ -268,6 +268,39 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
         }
     }, [mapInstance, clickSelectInteraction, hoverSelectInteraction]);
 
+    const updateGeofenceStyles = (userPositions: UserPosition[]) => {
+        if (!geofenceLayer) return;
+      
+        const source = geofenceLayer.getSource();
+        source?.getFeatures().forEach((feature) => {
+          const geometry = feature.getGeometry();
+          let userCount = 0;
+      
+          userPositions.forEach((user) => {
+            const userCoord = fromLonLat([user.geometry.coordinates[0], user.geometry.coordinates[1]]);
+            if (geometry?.intersectsCoordinate(userCoord)) {
+              userCount++;
+            }
+          });
+      
+          // Determine color based on user count
+          let fillColor: Color;
+          if (userCount === 0) fillColor = [0, 0, 255, 0.3]; // Green
+          else if (userCount <= 2) fillColor = [255, 255, 0, 0.3]; // Yellow
+          else fillColor = [255, 0, 0, 0.3]; // Red
+      
+          // Update feature style
+          feature.setStyle(
+            new Style({
+              fill: new Fill({ color: fillColor }),
+              stroke: new Stroke({ color: 'black', width: 1 }),
+            })
+          );
+        });
+      
+    };
+
+
     return {
         geofenceLayer,
         toggleEditing,
@@ -276,5 +309,6 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
         enableHoverPreview,
         enableClickSelection,
         disableSelectInteraction,
+        updateGeofenceStyles,
     };
 }

@@ -21,3 +21,13 @@ export function getClosestFeatureByWorldDistance(features: Feature[], pixel: Coo
     distances.sort((a, b) => a.distance - b.distance);
     return distances[0].feature;
 }
+
+export const countUsersInGeofence = (geofence: Feature, users: Feature[]): number => {
+    const geometry = geofence.getGeometry();
+    if (!geometry) return 0;
+
+    return users.filter((user) => {
+        const userGeometry = user.getGeometry() as Point;
+        return geometry.intersectsCoordinate(userGeometry.getCoordinates());
+    }).length;
+};
