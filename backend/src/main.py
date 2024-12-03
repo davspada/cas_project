@@ -166,7 +166,7 @@ class WebSocketServer:
                 users = await conn.fetch(users_query)
 
                 alerts_query = """
-                    SELECT ST_AsGeoJSON("geofence"), time_start, description 
+                    SELECT id, ST_AsGeoJSON("geofence"), time_start, description 
                     FROM ALERTS 
                     WHERE time_end IS NULL
                 """

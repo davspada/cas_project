@@ -38,6 +38,7 @@ const Dashboard = () => {
         type: "Feature",
         geometry: JSON.parse(alert.st_asgeojson),
         properties: {
+          id: alert.id,
           time_start: alert.time_start,
           description: alert.description,
         },

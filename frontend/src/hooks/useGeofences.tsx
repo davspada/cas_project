@@ -12,6 +12,7 @@ import { useWebSocket } from '@/contexts/WebSocketProvider';
 import Swal from 'sweetalert2';
 import { fromLonLat } from 'ol/proj';
 import { Color } from 'ol/color';
+import { Pixel } from 'ol/pixel';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
@@ -103,7 +104,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
 
     const enableClickSelection = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
-
+    
         const clickSelect = new Select({
             condition: click,
             layers: [geofenceLayer],
@@ -113,27 +114,40 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
             multi: false,
         });
         mapInstance.addInteraction(clickSelect);
-
+    
+        let lastClickedPixel: Pixel | null = null;
+        let currentFeatureIndex = 0;
+    
         mapInstance.on('click', (event) => {
             const features = mapInstance.getFeaturesAtPixel(event.pixel, {
                 layerFilter: (layer) => layer === geofenceLayer,
             });
-            let selectedFeature = null;
-            console.log(features.length);
-            if (features.length > 1) {
-                const lastFeatureIndex = features.length;
-                selectedFeature = features[lastFeatureIndex];
-            } else {
-                selectedFeature = features[1];
+    
+            // If the clicked pixel is different from the last clicked pixel, reset the index
+            if (!lastClickedPixel || lastClickedPixel.toString() !== event.pixel.toString()) {
+                currentFeatureIndex = 0;
             }
-
-            if (selectedFeature) {
-                selectedFeaturesSource.addFeature(selectedFeature);
+    
+            lastClickedPixel = event.pixel;
+    
+            if (features.length > 0) {
+                // Cycle through features
+                const feature = features[currentFeatureIndex];
+                if (!selectedFeaturesSource.getFeatures().includes(feature)) {
+                    selectedFeaturesSource.clear(); // Clear previous selections
+                    if (feature) {
+                        selectedFeaturesSource.addFeature(feature);
+                        console.log('Selected feature:', feature);
+                    }   
+                }
+                // Update the index for the next click
+                currentFeatureIndex = (currentFeatureIndex + 1) % features.length;
             } else {
                 selectedFeaturesSource.clear();
+                console.log("No feature selected, clearing selection");
             }
         });
-    }, [mapInstance, geofenceLayer]);
+    }, [mapInstance, geofenceLayer]);    
 
     const addInteraction = useCallback(
         (type: 'Polygon' | 'Circle' | null) => {
