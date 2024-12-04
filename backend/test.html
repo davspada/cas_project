@@ -79,7 +79,9 @@
         function updatePosition() {
             const lat = document.getElementById('latInput').value;
             const lon = document.getElementById('lonInput').value;
-            socket.send(JSON.stringify({ position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
+            const code = document.getElementById('codeInput').value;
+
+            socket.send(JSON.stringify({code: String(code), position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
             addMessage(`Sent position update: lat=${lat}, lon=${lon}`);
         }
 

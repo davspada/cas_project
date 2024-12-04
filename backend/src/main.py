@@ -16,7 +16,7 @@ DB_CONFIG = {
     "password": "password"
 }
 
-KAFKA_HOST = 'localhost'
+KAFKA_HOST = 'localhost:9092'
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,14 +44,14 @@ class WebSocketServer:
             logger.info("Starting Kafka consumer and producer...")
             self.kafka_consumer = AIOKafkaConsumer(
                 'alert-updates', 'user-updates', 'users-in-danger',
-                bootstrap_servers=f'{KAFKA_HOST}:9092',
+                bootstrap_servers=f'{KAFKA_HOST}',
                 auto_offset_reset='latest',
                 value_deserializer=lambda v: json.loads(v.decode('utf-8'))
             )
             await self.kafka_consumer.start()
 
             self.kafka_producer = AIOKafkaProducer(
-                bootstrap_servers=f'{KAFKA_HOST}:9092',
+                bootstrap_servers=f'{KAFKA_HOST}',
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
             await self.kafka_producer.start()
@@ -132,7 +132,7 @@ class WebSocketServer:
                 elif 'transport_method' in data:
                     await self.update_transport_method(code, data['transport_method'])
 
-                await self.kafka_producer.send('user-updates', key=code.encode('utf-8'), value=data)
+                await self.kafka_producer.send_and_wait('user-updates', json.dumps(data), partition=0)
 
         except Exception as e:
             logger.exception(f"Error handling mobile connection for user {code}")
@@ -193,8 +193,10 @@ class WebSocketServer:
             self.connected_frontend[websocket] = len(self.connected_frontend)
             logger.info(f"All data sent to frontend {self.connected_frontend[websocket]}, listening for updates...")
 
+            print("prima")
             kafka_task = asyncio.create_task(kafka_handler())
-
+            print("dopo")
+            
             async for message in websocket:
                 data = json.loads(message)
                 if 'time_end' in data:
@@ -216,7 +218,8 @@ class WebSocketServer:
                             "INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_GeomFromText($1, 4326), $2, $3)",
                             data['geofence'], formatted_date, data['description']
                         )
-                    await self.kafka_producer.send('alert-updates', value=data)
+
+                    await self.kafka_producer.send_and_wait('alert-updates', json.dumps(data), partition=0)
 
         except Exception as e:
             logger.exception(f"Error handling frontend connection")
