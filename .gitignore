@@ -20,3 +20,5 @@ backend/.vscode/
 
 backend/target/
 backend/data/
+
+app/

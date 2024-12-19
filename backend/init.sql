@@ -1,5 +1,6 @@
 -- Enable PostGIS extension
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS postgis_topology;
 
 -- Create USERS table
 CREATE TABLE USERS (
@@ -19,6 +20,10 @@ CREATE TABLE ALERTS (
     time_end timestamp,
     description text NOT NULL
 );
+
+-- Create index for geospatial queries
+CREATE INDEX idx_users_position ON users USING GIST(position);
+CREATE INDEX idx_alerts_geofence ON alerts USING GIST(geofence);
 
 -- Insert sample data into USERS
 INSERT INTO USERS (code, token, connected, position, transport_method)
