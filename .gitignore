@@ -22,3 +22,5 @@ backend/target/
 backend/data/
 
 app/
+
+backend/src/__pycache__/
