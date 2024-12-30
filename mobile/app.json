@@ -32,6 +32,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8c314219-fc15-4b29-aa77-68050aabf66f"
+      }
+    },
+    "owner": "davidespada"
   }
 }
