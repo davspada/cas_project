@@ -9,25 +9,24 @@ interface Message {
     content: string;
 }
 
-interface location_type{
-    lat: any;
-    lon: any;
+interface location_type {
+    lat: number;
+    lon: number;
+    speed: number | null;
 }
 
 const MapScreen = () => {
     const [location, setLocation] = useState<location_type | null>(null);
-    const [errorMsg, setErrorMsg] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);  // This line is not present in the original file
-    const websocket = useWebSocket((data) => {  // This line is not present in the original file
-        setMessages((prev) => [...prev, data as Message]);  // This line is not present in the original file
-    });
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [activity, setActivity] = useState<string>('Unknown');
+    const websocket = useWebSocket();
 
     useEffect(() => {
         let subscription;
 
         (async () => {
-            let { status } = await Location.requestForegroundPermissionsAsync();
+            const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 setErrorMsg('Permission to access location was denied');
                 Alert.alert("Location Permission", "Permission to access location was denied");
@@ -36,23 +35,34 @@ const MapScreen = () => {
             }
 
             // Get initial location
-            let loc = await Location.getCurrentPositionAsync({});
-            setLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+            const loc = await Location.getCurrentPositionAsync({});
+            setLocation({
+                lat: loc.coords.latitude,
+                lon: loc.coords.longitude,
+                speed: loc.coords.speed,
+            });
             setLoading(false);
 
             // Watch for location changes
             subscription = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.High,
-                    timeInterval: 5000, // Update every 5 second
+                    timeInterval: 1000, // Update every 5 seconds
                     distanceInterval: 1, // Update when user moves at least 1 meter
                 },
                 (loc) => {
-                    const newLocation = { lat: loc.coords.latitude, lon: loc.coords.longitude };
+                    const newLocation = {
+                        lat: loc.coords.latitude,
+                        lon: loc.coords.longitude,
+                        speed: loc.coords.speed,
+                    };
                     setLocation(newLocation);
-                    //console.log(newLocation)
-                    //console.log("location about to send = " + newLocation.lat + ", " + newLocation.lon);
-                    websocket.sendMessage({ code: 'test1', position: newLocation , transport_method: 'walking'});
+                    determineActivity(newLocation.speed);
+                    websocket.sendMessage({
+                        code: 'test1',
+                        position: { lat: newLocation.lat, lon: newLocation.lon },
+                        transport_method: activity,
+                    });
                 }
             );
         })();
@@ -60,7 +70,20 @@ const MapScreen = () => {
         return () => {
             if (subscription) subscription.remove();
         };
-    }, []);
+    }, [activity]);
+
+    const determineActivity = (speed: number | null) => {
+        if (speed === null || speed < 0.5) {
+            setActivity('still');
+        } else if (speed < 2) {
+            setActivity('walking');
+        } else if (speed < 5) {
+            setActivity('running');
+        } else {
+            setActivity('vehicle');
+        }
+        console.log('Activity:', activity);
+    };
 
     return (
         <View style={styles.container}>
@@ -85,9 +108,12 @@ const MapScreen = () => {
                 >
                     {location && (
                         <Marker
-                            coordinate={{ latitude: location.lat, longitude: location.lon }}
-                            title={"Your Location"}
-                            description={"This is where you are"}
+                            coordinate={{
+                                latitude: location.lat,
+                                longitude: location.lon,
+                            }}
+                            title={`Activity: ${activity}`}
+                            description={`Speed: ${location.speed?.toFixed(2) || 0} m/s`}
                         />
                     )}
                 </MapView>
