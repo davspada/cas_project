@@ -23,11 +23,6 @@ const MapScreen = () => {
         setMessages((prev) => [...prev, data as Message]);  // This line is not present in the original file
     });
 
-    const send_location = (): void =>{
-        websocket.sendMessage({ code: 'test1', position: location });
-        console.log("Location:"+location.latitude + location.longitude +" updated and sent to backend");
-    }
-
     useEffect(() => {
         let subscription;
 
@@ -49,15 +44,15 @@ const MapScreen = () => {
             subscription = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.High,
-                    timeInterval: 1000, // Update every 1 second
+                    timeInterval: 5000, // Update every 5 second
                     distanceInterval: 1, // Update when user moves at least 1 meter
                 },
                 (loc) => {
                     const newLocation = { lat: loc.coords.latitude, lon: loc.coords.longitude };
                     setLocation(newLocation);
-                    console.log(newLocation)
+                    //console.log(newLocation)
                     //console.log("location about to send = " + newLocation.lat + ", " + newLocation.lon);
-                    websocket.sendMessage({ code: 'test1', position: newLocation });
+                    websocket.sendMessage({ code: 'test1', position: newLocation , transport_method: 'walking'});
                 }
             );
         })();

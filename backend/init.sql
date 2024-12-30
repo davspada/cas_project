@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS postgis_topology;
 CREATE TABLE USERS (
     id SERIAL PRIMARY KEY,
     code varchar(20) UNIQUE NOT NULL,
-    "token" varchar(20) UNIQUE NOT NULL,
+    "token" varchar UNIQUE NOT NULL, --better to be unlimited for compatibility purposes
     connected boolean NOT NULL,
     position public.geometry,
     transport_method varchar(20)

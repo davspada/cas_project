@@ -1,102 +1,112 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Image, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+import { Accelerometer } from 'expo-sensors';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const ActivityRecognition = () => {
+  const [data, setData] = useState({ x: 0, y: 0, z: 0 });
+  const [activity, setActivity] = useState('Unknown');
+  const [subscription, setSubscription] = useState(null);
 
-export default function TabTwoScreen() {
+  const THRESHOLDS = {
+    still: 0.3,    // Below this, user is still (m/s²)
+    walking: 1.5,  // Between still and running thresholds
+    running: 3.0,  // Above this, user is running
+  };
+
+  // Low-pass filter for gravity
+  const [gravity, setGravity] = useState({ x: 0, y: 0, z: 0 });
+  const ALPHA = 0.8;
+
+  // Start accelerometer monitoring
+  const startMonitoring = () => {
+    Accelerometer.setUpdateInterval(1000); // 1s update interval
+    const sub = Accelerometer.addListener((accelerometerData) => {
+      setData(accelerometerData);
+    });
+    setSubscription(sub);
+  };
+
+  // Stop accelerometer monitoring
+  const stopMonitoring = () => {
+    subscription?.remove();
+    setSubscription(null);
+  };
+
+  // Calculate the magnitude of acceleration vector excluding gravity
+  const calculateMagnitude = (x, y, z) => {
+    // Apply low-pass filter to isolate gravity
+    const gX = ALPHA * gravity.x + (1 - ALPHA) * x;
+    const gY = ALPHA * gravity.y + (1 - ALPHA) * y;
+    const gZ = ALPHA * gravity.z + (1 - ALPHA) * z;
+    setGravity({ x: gX, y: gY, z: gZ });
+
+    // Remove gravity from accelerometer readings
+    const linearX = x - gX;
+    const linearY = y - gY;
+    const linearZ = z - gZ;
+
+    // Calculate magnitude of linear acceleration
+    return Math.sqrt(linearX ** 2 + linearY ** 2 + linearZ ** 2);
+  };
+
+  // Analyze activity based on accelerometer data
+  useEffect(() => {
+    if (!data) return;
+
+    const magnitude = calculateMagnitude(data.x, data.y, data.z);
+
+    if (magnitude < THRESHOLDS.still) {
+      setActivity('Still');
+    } else if (magnitude < THRESHOLDS.walking) {
+      setActivity('Walking');
+    } else if (magnitude < THRESHOLDS.running) {
+      setActivity('Running');
+    } else {
+      setActivity('In Vehicle');
+    }
+  }, [data]);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={<Ionicons size={310} name="code-slash" style={styles.headerImage} />}>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText> library
-          to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <Text style={styles.title}>Activity Recognition</Text>
+      <Text style={styles.activity}>Current Activity: {activity}</Text>
+      <View style={styles.dataContainer}>
+        <Text>X: {data.x.toFixed(2)}</Text>
+        <Text>Y: {data.y.toFixed(2)}</Text>
+        <Text>Z: {data.z.toFixed(2)}</Text>
+      </View>
+      <View style={styles.buttons}>
+        <Button title="Start Monitoring" onPress={startMonitoring} />
+        <Button title="Stop Monitoring" onPress={stopMonitoring} />
+      </View>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  titleContainer: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  activity: {
+    fontSize: 20,
+    marginBottom: 16,
+  },
+  dataContainer: {
+    marginBottom: 16,
+  },
+  buttons: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    width: '80%',
   },
 });
+
+export default ActivityRecognition;
