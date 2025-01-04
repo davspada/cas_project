@@ -46,7 +46,7 @@ const MapScreen = () => {
             // Watch for location changes
             subscription = await Location.watchPositionAsync(
                 {
-                    accuracy: Location.Accuracy.High,
+                    accuracy: Location.Accuracy.Balanced,  //for privacy reasons, we don't need high accuracy
                     timeInterval: 1000, // Update every 5 seconds
                     distanceInterval: 1, // Update when user moves at least 1 meter
                 },

@@ -1,11 +1,47 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Image, StyleSheet, TextInput, Button, Alert } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import useWebSocket from '@/hooks/useWebSocket';
 
-export default function HomeScreen() {
+interface Message {
+  type: string;
+  content: string;
+}
+
+export default function LoginScreen() {
+  const [code, setCode] = useState('');
+  const [token, setToken] = useState('');
+  const [storedCode, setStoredCode] = useState('');
+  const [storedToken, setStoredToken] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const websocket = useWebSocket((data) => {
+    setMessages((prev) => [...prev, data as Message]);
+  });
+
+  useEffect(() => {
+    // Fetch code and token from local storage
+    const fetchStoredData = async () => {
+      const storedCode = await AsyncStorage.getItem('code');
+      const storedToken = await AsyncStorage.getItem('token');
+      if (storedCode) setStoredCode(storedCode);
+      if (storedToken) setStoredToken(storedToken);
+    };
+    fetchStoredData();
+  }, []);
+
+  const handleLogin = () => {
+    if (code === storedCode && (token === storedToken || token === '')) {
+      Alert.alert('Login Successful');
+    } else {
+      Alert.alert('Invalid Code or Token');
+    }
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -15,50 +51,36 @@ export default function HomeScreen() {
           style={styles.reactLogo}
         />
       }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+      <ThemedView style={styles.container}>
+        <ThemedText type="title">Login</ThemedText>
+        <TextInput
+          style={styles.input}
+          placeholder="Code"
+          value={code}
+          onChangeText={setCode}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Token (optional)"
+          value={token}
+          onChangeText={setToken}
+        />
+        <Button title="Login" onPress={handleLogin} />
       </ThemedView>
     </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    padding: 16,
+    gap: 16,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    paddingHorizontal: 8,
   },
   reactLogo: {
     height: 178,
