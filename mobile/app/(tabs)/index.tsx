@@ -23,20 +23,31 @@ export default function LoginScreen() {
     setMessages((prev) => [...prev, data as Message]);
   });
 
+  const fetchStoredData = async () => {
+    const storedCode = await AsyncStorage.getItem('code');
+    const storedToken = await AsyncStorage.getItem('token');
+    console.log(storedCode, storedToken);
+    if (storedCode) {
+      setStoredCode(storedCode);
+      setCode(storedCode);
+    }
+    if (storedToken) {
+      setStoredToken(storedToken);
+      setToken(storedToken);
+    }
+  };
+
   useEffect(() => {
     // Fetch code and token from local storage
-    const fetchStoredData = async () => {
-      const storedCode = await AsyncStorage.getItem('code');
-      const storedToken = await AsyncStorage.getItem('token');
-      if (storedCode) setStoredCode(storedCode);
-      if (storedToken) setStoredToken(storedToken);
-    };
     fetchStoredData();
   }, []);
 
-  const handleLogin = () => {
-    if (code === storedCode && (token === storedToken || token === '')) {
+  const handleLogin = async () => {
+    //fetchStoredData();
+    if (code) {
       Alert.alert('Login Successful');
+      await AsyncStorage.setItem('code', code);
+      await AsyncStorage.setItem('token', token);
     } else {
       Alert.alert('Invalid Code or Token');
     }
