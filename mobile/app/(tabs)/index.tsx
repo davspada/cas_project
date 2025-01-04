@@ -6,34 +6,49 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import useWebSocket from '@/hooks/useWebSocket';
+import * as Application from 'expo-application';
+import 'react-native-get-random-values'; // Required for uuidv4
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   type: string;
   content: string;
 }
 
+const getUniqueId = async () => {
+  const appID = Application.applicationId
+  const uniqueId = `${appID}-${uuidv4()}`;
+  return uniqueId;
+};
+
 export default function LoginScreen() {
   const [code, setCode] = useState('');
-  const [token, setToken] = useState('');
-  const [storedCode, setStoredCode] = useState('');
-  const [storedToken, setStoredToken] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  const websocket = useWebSocket((data) => {
-    setMessages((prev) => [...prev, data as Message]);
-  });
+  const [token, setToken] = useState('');;
+  const [storedToken, setStoredToken] = useState<string | null>(null);
 
   const fetchStoredData = async () => {
-    const storedCode = await AsyncStorage.getItem('code');
-    const storedToken = await AsyncStorage.getItem('token');
-    console.log(storedCode, storedToken);
-    if (storedCode) {
-      setStoredCode(storedCode);
-      setCode(storedCode);
-    }
-    if (storedToken) {
-      setStoredToken(storedToken);
-      setToken(storedToken);
+    try {
+      const storedCode = await AsyncStorage.getItem('code');
+      const storedToken = await AsyncStorage.getItem('token');
+  
+      console.log('Stored Code:', storedCode, 'Stored Token:', storedToken);
+  
+      if (storedCode) {
+        setCode(storedCode);
+      }
+  
+      if (storedToken) {
+        setStoredToken(storedToken);
+        setToken(storedToken);
+      } else {
+        const newToken = await getUniqueId();
+        console.log("NEW TOKEN CREATED: " + newToken);
+        await AsyncStorage.setItem('token', newToken); // Save the new token
+        setStoredToken(newToken);
+        setToken(newToken);
+      }
+    } catch (error) {
+      console.error('Error fetching data from AsyncStorage:', error);
     }
   };
 
@@ -43,7 +58,7 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
-    //fetchStoredData();
+    fetchStoredData();
     if (code) {
       Alert.alert('Login Successful');
       await AsyncStorage.setItem('code', code);
