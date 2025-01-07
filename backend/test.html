@@ -81,13 +81,15 @@
             const lon = document.getElementById('lonInput').value;
             const code = document.getElementById('codeInput').value;
 
-            socket.send(JSON.stringify({code: String(code), position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
+            socket.send(JSON.stringify({ code: String(code), position: { lat: parseFloat(lat), lon: parseFloat(lon) } }));
             addMessage(`Sent position update: lat=${lat}, lon=${lon}`);
         }
 
         function updateTransportMethod() {
             const transportMethod = document.getElementById('transportInput').value;
-            socket.send(JSON.stringify({ transport_method: transportMethod }));
+            const code = document.getElementById('codeInput').value;
+
+            socket.send(JSON.stringify({ code: String(code), transport_method: transportMethod }));
             addMessage(`Sent transport method update: ${transportMethod}`);
         }
 

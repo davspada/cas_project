@@ -24,7 +24,7 @@ RUN poetry config virtualenvs.create false && poetry install --no-interaction --
 # Copy application code
 COPY . .
 
-# Expose ports (e.g., 8080: Web API, 8081: WebSocket)
+# Expose ports for the application
 EXPOSE 8080 8081
 
 # Health check to ensure the app is running
@@ -32,4 +32,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s \
     CMD python -c "import logging_utils" || exit 1
 
 # Command to run the application
-CMD ["python", "src/main.py"]
+CMD ["python3", "src/main.py"]

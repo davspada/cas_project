@@ -11,7 +11,7 @@ class AdvancedLogger:
     def get_logger(
         cls,
         directory_log: Optional[str] = None,
-        log_level: Union[int, str] = logging.INFO,
+        #log_level: Union[int, str] = logging.INFO,
         max_size_log: int = 5 * 1024 * 1024,  # 5MB
         backup_number: int = 5
     ) -> logging.Logger:
@@ -33,12 +33,12 @@ class AdvancedLogger:
 
         # Determine the default directory and create the directory if it does not exist
         if directory_log is None:
-            directory_log = os.path.join('../log/', default_name)
+            directory_log = os.path.join('./log/', default_name)
         os.makedirs(directory_log, exist_ok=True)
 
         # Create the logger
         logger = logging.getLogger(default_name)
-        logger.setLevel(log_level)
+        #logger.setLevel(log_level)
         logger.handlers.clear()  # Remove the default handler if it exists
 
         # Formatter for the message format
@@ -49,7 +49,7 @@ class AdvancedLogger:
 
         # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(log_level)
+        #console_handler.setLevel(log_level)
         console_handler.setFormatter(msg_format)
         logger.addHandler(console_handler)
 
@@ -60,7 +60,7 @@ class AdvancedLogger:
             maxBytes=max_size_log,
             backupCount=backup_number
         )
-        file_handler.setLevel(log_level)
+        #file_handler.setLevel(log_level)
         file_handler.setFormatter(msg_format)
         logger.addHandler(file_handler)
 

@@ -104,6 +104,9 @@ class WebSocketServer:
                     await self.db.update_alert(data['time_end'], data['geofence'])
                     await self.kafka.send_message('alert-updates', data)
                 elif 'geofence' in data:
+                    
+                    self.logger.info(f"Creating alert: {data}")
+                    
                     try:
                         formatted_date = datetime.fromisoformat(
                             data['time_start'].replace("Z", "+00:00")
@@ -112,12 +115,21 @@ class WebSocketServer:
                         self.logger.error(f"Invalid datetime format in time_start: {data['time_start']}")
                         continue
 
+                    self.logger.info(f"Alert time_start: {formatted_date}")
+
                     await self.db.create_alert(
                         data['geofence'], formatted_date, data['description']
                     )
+
+                    self.logger.info(f"Alert created: {data}")
+
                     await self.kafka.send_message('alert-updates', data)
 
+                    self.logger.info(f"Checking users in danger for alert: {data}")
+
                     await self.db.check_users_in_danger(data)
+
+                    self.logger.info(f"Users in danger checked for alert: {data}")
                         
 
 
@@ -129,25 +141,11 @@ class WebSocketServer:
             self.connections.remove_frontend_connection(websocket)
             self.logger.info("Frontend disconnected")
 
-    async def kafka_listener(self):
-        try:
-            async for message in self.kafka.consumer:
-                if (message.topic == 'users-in-danger' and 
-                    message.key in self.connections.connected_mobile):
-                    await self.connections.send_message(
-                        self.connections.connected_mobile[message.key],
-                        message.value
-                    )
-        except Exception as e:
-            self.logger.exception("Error in Kafka listener")
-
     async def run(self, host, port):
         try:
-            await self.db.connect()
-            await self.kafka.start()
+            await self.db.connect() 
 
-            kafka_task = asyncio.create_task(self.kafka_listener())
-
+            kafka_task = await self.kafka.start()
             server_mobile = await websockets.serve(self.handle_mobile, host, port)
             server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
 

@@ -35,5 +35,8 @@ class ConnectionManager:
     def get_mobile_connections(self):
         return self.connected_mobile.keys()
     
+    def get_mobile_connection(self, code):
+        return self.connected_mobile[code]
+    
     def get_frontend_connections(self):
         return self.connected_frontend.keys()

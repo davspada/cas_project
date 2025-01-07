@@ -117,6 +117,5 @@ class DatabaseManager:
                 for user in await conn.fetch(query, data["geofence"]):
                     self.kafka_producer.send(
                         'users-in-danger',
-                        key=user['code'].encode('utf-8'),
-                        value=self.messages[zone] + data["description"]
+                        value="code: " + user['code'] + ", message: " + self.messages[zone] + data["description"]
                     )
