@@ -1,4 +1,3 @@
-# database.py
 import asyncpg
 from logging_utils import AdvancedLogger
 
@@ -84,3 +83,38 @@ class DatabaseManager:
                 "INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_GeomFromText($1, 4326), $2, $3)",
                 geofence, time_start, description
             )
+
+    async def check_users_in_danger(self, geofence, messages):
+        async with self.db_pool.acquire() as conn:
+            query_templates = {
+                'inside': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_Within(position, ST_GeomFromGeoJSON($1)) AND connected = true;
+                """,
+                'in_1km': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
+                        AND NOT ST_Within(position, ST_GeomFromGeoJSON($1))
+                        AND connected = true;
+                """,
+                'in_2km': """
+                    SELECT code
+                    FROM users
+                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 2000)
+                        AND NOT ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
+                        AND connected = true;
+                """
+            }
+            
+            for zone, query in query_templates.items():
+                results = await conn.fetch(query, geofence)
+                for point in results:
+                    self.kafka_producer.send(
+                        'users-in-danger',
+                        key=point['code'].encode('utf-8'),
+                        value=messages[zone]
+                    )
+                    
+            return results

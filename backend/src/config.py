@@ -1,4 +1,3 @@
-# config.py
 DB_CONFIG = {
     "host": "postgis",
     "database": "mydb",

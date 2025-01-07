@@ -1,4 +1,3 @@
-# connection_manager.py
 from typing import Dict
 import websockets
 import json
@@ -29,3 +28,12 @@ class ConnectionManager:
     def remove_frontend_connection(self, websocket):
         if websocket in self.connected_frontend:
             del self.connected_frontend[websocket]
+            
+    def get_mobile_code(self):
+        return self.connected_mobile.items()
+    
+    def get_mobile_connections(self):
+        return self.connected_mobile.keys()
+    
+    def get_frontend_connections(self):
+        return self.connected_frontend.keys()

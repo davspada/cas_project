@@ -1,4 +1,3 @@
-# websocket_server.py
 import asyncio
 import json
 import secrets
@@ -13,10 +12,9 @@ from logging_utils import AdvancedLogger
 
 class WebSocketServer:
     def __init__(self):
-        self.name = "WebSocketServer"
-        self.db = DatabaseManager(DB_CONFIG)
-        self.kafka = KafkaManager(KAFKA_HOST)
         self.connections = ConnectionManager()
+        self.db = DatabaseManager(DB_CONFIG)
+        self.kafka = KafkaManager(KAFKA_HOST, self.connections)
         self.logger = AdvancedLogger.get_logger()
 
     async def handle_mobile(self, websocket, path):
@@ -28,16 +26,21 @@ class WebSocketServer:
             mobile_token = data.get('token')
 
             if not code:
+                self.logger.warning("Invalid code in mobile connection")
+                self.connections.send_message(websocket, {"error": "Invalid code"})
                 return
 
             row = await self.db.get_user_token(code)
+            
             if row and row['token'] != mobile_token:
                 self.logger.warning(f"Invalid token for user {code}")
+                self.connections.send_message(websocket, {"error": "Invalid token"})
                 return
+            
             elif not row:
                 new_token = secrets.token_hex(16)
                 await self.db.create_user(code, new_token)
-                await websocket.send(json.dumps({"token": new_token}))
+                self.connections.send_message(websocket, {"token": new_token})
 
             await self.db.update_user_connection(code, True)
             self.connections.add_mobile_connection(code, websocket)
@@ -47,7 +50,7 @@ class WebSocketServer:
                 data = json.loads(message)
                 if 'position' in data:
                     await self.db.update_user_location(code, data['position'])
-                elif 'transport_method' in data:
+                if 'transport_method' in data:
                     await self.db.update_transport_method(code, data['transport_method'])
 
                 await self.kafka.send_message('user-updates', data)
