@@ -6,6 +6,11 @@ class DatabaseManager:
         self.config = config
         self.logger = AdvancedLogger.get_logger()
         self.pool = None
+        self.messages = {
+            "inside": "URGENT: You are in a ",
+            "in_1km": "ALERT: You are within 1km of a ",
+            "in_2km": "ATTENTION: You are within 2km of a "
+        }
 
     async def connect(self):
         try:
@@ -84,7 +89,7 @@ class DatabaseManager:
                 geofence, time_start, description
             )
 
-    async def check_users_in_danger(self, geofence, messages):
+    async def check_users_in_danger(self, data):
         async with self.db_pool.acquire() as conn:
             query_templates = {
                 'inside': """
@@ -109,12 +114,9 @@ class DatabaseManager:
             }
             
             for zone, query in query_templates.items():
-                results = await conn.fetch(query, geofence)
-                for point in results:
+                for user in await conn.fetch(query, data["geofence"]):
                     self.kafka_producer.send(
                         'users-in-danger',
-                        key=point['code'].encode('utf-8'),
-                        value=messages[zone]
+                        key=user['code'].encode('utf-8'),
+                        value=self.messages[zone] + data["description"]
                     )
-                    
-            return results

@@ -117,6 +117,10 @@ class WebSocketServer:
                     )
                     await self.kafka.send_message('alert-updates', data)
 
+                    await self.db.check_users_in_danger(data)
+                        
+
+
         except Exception as e:
             self.logger.exception("Error handling frontend connection")
         finally:
