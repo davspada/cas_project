@@ -63,6 +63,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
 
                 const feature = new Feature({
                     geometry,
+                    properties: alert.properties, // Set properties from the alert
                 });
                 return feature;
             });
@@ -138,6 +139,18 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                     if (feature) {
                         selectedFeaturesSource.addFeature(feature);
                         console.log('Selected feature:', feature);
+                        const properties = feature.getProperties().properties;
+                        console.log('Feature properties:', properties);
+            
+                        // Example: Show properties in a popup using Swal
+                        Swal.fire({
+                            title: 'Feature Information',
+                            html: `<p><strong>Alert id:</strong> ${properties.id}</p>
+                                    <p><strong>Description:</strong> ${properties.description}</p>
+                                   <p><strong>Time Start:</strong> ${properties.time_start}</p>`,
+                            icon: 'info',
+                        });
+
                     }   
                 }
                 // Update the index for the next click
@@ -215,7 +228,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                             // Send the message via WebSocket (send the newAlert as a stringified object)
                             sendMessage(JSON.stringify(newAlert));
                             Swal.fire({
-                                position: "top-end",
+                                //position: "top-end",
                                 icon: "success",
                                 title: "Alert saved",
                                 showConfirmButton: false,
