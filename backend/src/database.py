@@ -7,9 +7,9 @@ class DatabaseManager:
         self.logger = AdvancedLogger.get_logger()
         self.pool = None
         self.messages = {
-            "inside": "URGENT: You are in a ",
-            "in_1km": "ALERT: You are within 1km of a ",
-            "in_2km": "ATTENTION: You are within 2km of a "
+            "inside": "URGENT! You are in a",
+            "in_1km": "ALERT! You are within 1km of a",
+            "in_2km": "ATTENTION! You are within 2km of a"
         }
 
     async def connect(self):
@@ -90,32 +90,47 @@ class DatabaseManager:
             )
 
     async def check_users_in_danger(self, data):
-        async with self.db_pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             query_templates = {
                 'inside': """
                     SELECT code
                     FROM users
-                    WHERE ST_Within(position, ST_GeomFromGeoJSON($1)) AND connected = true;
+                    WHERE ST_Within(position, ST_SetSRID(ST_GeomFromText($1), 4326)) AND connected = true;
                 """,
                 'in_1km': """
                     SELECT code
                     FROM users
-                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
-                        AND NOT ST_Within(position, ST_GeomFromGeoJSON($1))
-                        AND connected = true;
+                    WHERE ST_DWithin(
+                        ST_Transform(position, 3857), 
+                        ST_Transform(ST_SetSRID(ST_GeomFromText($1), 4326), 3857), 
+                        1000
+                    )
+                    AND NOT ST_Within(position, ST_SetSRID(ST_GeomFromText($1), 4326))
+                    AND connected = true;
                 """,
                 'in_2km': """
                     SELECT code
                     FROM users
-                    WHERE ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 2000)
-                        AND NOT ST_DWithin(ST_Transform(position, 3857), ST_Transform(ST_GeomFromGeoJSON($1), 3857), 1000)
-                        AND connected = true;
+                    WHERE ST_DWithin(
+                        ST_Transform(position, 3857), 
+                        ST_Transform(ST_SetSRID(ST_GeomFromText($1), 4326), 3857), 
+                        2000
+                    )
+                    AND NOT ST_DWithin(
+                        ST_Transform(position, 3857), 
+                        ST_Transform(ST_SetSRID(ST_GeomFromText($1), 4326), 3857), 
+                        1000
+                    )
+                    AND connected = true;
                 """
             }
             
+            messages = []
+
             for zone, query in query_templates.items():
                 for user in await conn.fetch(query, data["geofence"]):
-                    self.kafka_producer.send(
-                        'users-in-danger',
-                        value="code: " + user['code'] + ", message: " + self.messages[zone] + data["description"]
+                    messages.append(
+                        f"code: {user['code']}, message: {self.messages[zone]} {data['description']}"
                     )
+
+            return messages

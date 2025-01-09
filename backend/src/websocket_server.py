@@ -12,10 +12,10 @@ from logging_utils import AdvancedLogger
 
 class WebSocketServer:
     def __init__(self):
+        self.logger = AdvancedLogger.get_logger()
         self.connections = ConnectionManager()
         self.db = DatabaseManager(DB_CONFIG)
         self.kafka = KafkaManager(KAFKA_HOST, self.connections)
-        self.logger = AdvancedLogger.get_logger()
 
     async def handle_mobile(self, websocket, path):
         code = None
@@ -104,9 +104,6 @@ class WebSocketServer:
                     await self.db.update_alert(data['time_end'], data['geofence'])
                     await self.kafka.send_message('alert-updates', data)
                 elif 'geofence' in data:
-                    
-                    self.logger.info(f"Creating alert: {data}")
-                    
                     try:
                         formatted_date = datetime.fromisoformat(
                             data['time_start'].replace("Z", "+00:00")
@@ -115,22 +112,13 @@ class WebSocketServer:
                         self.logger.error(f"Invalid datetime format in time_start: {data['time_start']}")
                         continue
 
-                    self.logger.info(f"Alert time_start: {formatted_date}")
-
                     await self.db.create_alert(
                         data['geofence'], formatted_date, data['description']
                     )
 
-                    self.logger.info(f"Alert created: {data}")
-
                     await self.kafka.send_message('alert-updates', data)
-
-                    self.logger.info(f"Checking users in danger for alert: {data}")
-
-                    await self.db.check_users_in_danger(data)
-
-                    self.logger.info(f"Users in danger checked for alert: {data}")
-                        
+                    for message in await self.db.check_users_in_danger(data):
+                        await self.kafka.send_message('users-in-danger', message)
 
 
         except Exception as e:
@@ -143,9 +131,13 @@ class WebSocketServer:
 
     async def run(self, host, port):
         try:
-            await self.db.connect() 
+            self.logger.info("Starting WebSocket server...")
 
-            kafka_task = await self.kafka.start()
+            await self.db.connect() 
+            await self.kafka.start()
+
+            self.logger.info("Starting mobile and frontend WebSocket servers...")
+
             server_mobile = await websockets.serve(self.handle_mobile, host, port)
             server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
 
@@ -154,8 +146,7 @@ class WebSocketServer:
 
             await asyncio.gather(
                 server_mobile.wait_closed(),
-                server_frontend.wait_closed(),
-                kafka_task
+                server_frontend.wait_closed()
             )
         except Exception as e:
             self.logger.exception("Error running the WebSocket server")
