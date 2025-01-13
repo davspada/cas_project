@@ -1,3 +1,5 @@
+import * as Notification  from "expo-notifications";
+
 type Message = Record<string, unknown>;
 
 class WebSocketService {
