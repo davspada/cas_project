@@ -14,7 +14,7 @@ const Tab1: React.FC = () => {
   });
 
   const connect_to_backend = (): void => {
-    websocket.sendMessage({ code: 'test1', token : '325a46d0749f7d6b607ecf3739c4734f' });
+    websocket.sendMessage({ code: 'test1', token : '65976c0ef60f9d5e3f4e3519a68a687c' });
   };
 
   return (

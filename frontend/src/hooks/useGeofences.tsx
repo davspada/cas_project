@@ -5,18 +5,21 @@ import { Draw, Modify, Select, Snap } from 'ol/interaction';
 import { Feature } from 'ol';
 import { Fill, Stroke, Style } from 'ol/style';
 import { Map } from 'ol';
-import { GeoJSON } from 'ol/format';
+import { GeoJSON, WKT } from 'ol/format';
 import { click, pointerMove } from 'ol/events/condition';
 import { Alert } from '@/types';
-import { getClosestFeatureByWorldDistance } from '@/utils/mapUtils';
-import { FeatureLike } from 'ol/Feature';
+import { useWebSocket } from '@/contexts/WebSocketProvider';
+import Swal from 'sweetalert2';
+import { fromLonLat } from 'ol/proj';
+import { Color } from 'ol/color';
+import { Pixel } from 'ol/pixel';
 
 interface UseGeofencesProps {
     mapInstance: Map | null;
     alerts: Alert[] | null;
 }
 
-export default function useGeofences({ mapInstance }: UseGeofencesProps) {
+export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps) {
     const [geofenceLayer, setGeofenceLayer] = useState<VectorLayer | null>(null);
     const [geofenceData, setGeofenceData] = useState<Feature[]>([]);
     const [selectedFeaturesSource] = useState(new VectorSource());
@@ -26,6 +29,8 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
     const [snapInteraction, setSnapInteraction] = useState<Snap | null>(null);
     const [hoverSelectInteraction, setHoverSelectInteraction] = useState<Select | null>(null);
     const [clickSelectInteraction, setClickSelectInteraction] = useState<Select | null>(null);
+
+    const { sendMessage, isConnected, latestMessage } = useWebSocket();
 
     useEffect(() => {
         if (!mapInstance) return;
@@ -50,59 +55,53 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         });
         mapInstance.addLayer(selectedFeaturesLayer);
 
-        const fetchAlerts = async () => {
-            try {
-                const response = await fetch('http://localhost:3001/api/alerts'); // Adjust API endpoint
-                const data = await response.json();
-                const format = new GeoJSON();
-                const features = format.readFeatures(data, {
-                    featureProjection: mapInstance.getView().getProjection(),
-                });
-                source.addFeatures(features);
-                setGeofenceData(features);
-            } catch (error) {
-                console.error('Error fetching user positions:', error);
-            }
-        };
+        if (alerts) {
+            const features = alerts.map((alert) => {
+                const geometry = new GeoJSON().readGeometry(alert.geometry);
+                // Transform the geometry to match the map's projection
+                geometry.transform('EPSG:4326', 'EPSG:3857');
 
-        fetchAlerts();
+                const feature = new Feature({
+                    geometry,
+                    properties: alert.properties, // Set properties from the alert
+                });
+                return feature;
+            });
+            source.addFeatures(features);
+            setGeofenceData(features);
+        }
+
         enableHoverPreview();
         enableClickSelection();
 
         return () => {
             mapInstance.removeLayer(layer);
         };
-    }, [mapInstance]);
+    }, [mapInstance, alerts]);
 
     const enableHoverPreview = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
-    
+
         const hoverSelect = new Select({
             condition: pointerMove,
             layers: [geofenceLayer],
-            /*style: new Style({
-                fill: new Fill({ color: 'rgba(0, 255, 0, 0.3)' }),
-                stroke: new Stroke({ color: '#00FF00', width: 2 }),
-            }),*/
             multi: true,
-
         });
         mapInstance.addInteraction(hoverSelect);
-    
+
         mapInstance.on('pointermove', (event) => {
             const features = mapInstance.getFeaturesAtPixel(event.pixel, {
                 layerFilter: (layer) => layer === geofenceLayer,
             });
-            var selectedFeature = null;
+            let selectedFeature = null;
             if (features.length > 0) {
                 const lastFeatureIndex = features.length - 1;
                 selectedFeature = features[lastFeatureIndex];
-            }else{
-                selectedFeature = features[0]
+            } else {
+                selectedFeature = features[0];
             }
         });
     }, [mapInstance, geofenceLayer]);
-    
 
     const enableClickSelection = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
@@ -111,79 +110,150 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
             condition: click,
             layers: [geofenceLayer],
             style: new Style({
-                //fill: new Fill({ color: 'rgba(255, 0, 0, 0.3)' }),
                 stroke: new Stroke({ color: '#FF0000', width: 2 }),
             }),
             multi: false,
         });
         mapInstance.addInteraction(clickSelect);
     
+        let lastClickedPixel: Pixel | null = null;
+        let currentFeatureIndex = 0;
+    
         mapInstance.on('click', (event) => {
             const features = mapInstance.getFeaturesAtPixel(event.pixel, {
                 layerFilter: (layer) => layer === geofenceLayer,
             });
-            var selectedFeature = null;
-            console.log(features.length)
-            if (features.length > 1) {
-                const lastFeatureIndex = features.length;
-                selectedFeature = features[lastFeatureIndex];
-            }else{
-                selectedFeature = features[1]
+    
+            // If the clicked pixel is different from the last clicked pixel, reset the index
+            if (!lastClickedPixel || lastClickedPixel.toString() !== event.pixel.toString()) {
+                currentFeatureIndex = 0;
             }
-            //console.log(selectedFeature)
+    
+            lastClickedPixel = event.pixel;
+    
+            if (features.length > 0) {
+                // Cycle through features
+                const feature = features[currentFeatureIndex];
+                if (!selectedFeaturesSource.getFeatures().includes(feature)) {
+                    selectedFeaturesSource.clear(); // Clear previous selections
+                    if (feature) {
+                        selectedFeaturesSource.addFeature(feature);
+                        console.log('Selected feature:', feature);
+                        const properties = feature.getProperties().properties;
+                        console.log('Feature properties:', properties);
             
-            if (selectedFeature) {
-                selectedFeaturesSource.addFeature(selectedFeature);
-            }else{
+                        // Example: Show properties in a popup using Swal
+                        Swal.fire({
+                            title: 'Feature Information',
+                            html: `<p><strong>Alert id:</strong> ${properties.id}</p>
+                                    <p><strong>Description:</strong> ${properties.description}</p>
+                                   <p><strong>Time Start:</strong> ${properties.time_start}</p>`,
+                            icon: 'info',
+                        });
+
+                    }   
+                }
+                // Update the index for the next click
+                currentFeatureIndex = (currentFeatureIndex + 1) % features.length;
+            } else {
                 selectedFeaturesSource.clear();
+                console.log("No feature selected, clearing selection");
             }
         });
-    }, [mapInstance, geofenceLayer]);
+    }, [mapInstance, geofenceLayer]);    
 
-    const addInteraction = useCallback((type: 'Polygon' | 'Circle' | null) => {
-        if (!mapInstance || !geofenceLayer) return;
+    const addInteraction = useCallback(
+        (type: 'Polygon' | 'Circle' | null) => {
+            if (!mapInstance || !geofenceLayer) return;
 
-        if (drawInteraction) {
-            mapInstance.removeInteraction(drawInteraction);
-            setDrawInteraction(null);
-        }
-        if (snapInteraction) {
-            mapInstance.removeInteraction(snapInteraction);
-            setSnapInteraction(null);
-        }
-
-        if (type === 'Polygon' || type === 'Circle') {
-            const draw = new Draw({
-                source: geofenceLayer.getSource()!,
-                type,
-            });
-            mapInstance.addInteraction(draw);
-            setDrawInteraction(draw);
-
-            const snap = new Snap({ source: geofenceLayer.getSource()! });
-            mapInstance.addInteraction(snap);
-            setSnapInteraction(snap);
-
-            draw.on('drawend', (event) => {
-                const newFeature = event.feature;
-                setGeofenceData((prevData) => [...prevData, newFeature]);
-                console.log('New geofence data:', newFeature.getGeometry()?.getCoordinates());
-            });
-        }
-        else if(type === null){ //happens if type is null
-            //Remove any existing draw interactions
-            console.log("interaction pop call");
-            let draw_interaction = undefined;
-            mapInstance.getInteractions().forEach(function (interaction) {
-            if (interaction instanceof Draw) {
-                draw_interaction = interaction;
+            if (drawInteraction) {
+                mapInstance.removeInteraction(drawInteraction);
+                setDrawInteraction(null);
             }
-            });
-            if (draw_interaction) {
-                mapInstance.removeInteraction(draw_interaction);
+            if (snapInteraction) {
+                mapInstance.removeInteraction(snapInteraction);
+                setSnapInteraction(null);
             }
-        }
-    }, [mapInstance, geofenceLayer]);
+
+            if (type === 'Polygon' || type === 'Circle') {
+                const draw = new Draw({
+                    source: geofenceLayer.getSource()!,
+                    type,
+                });
+                mapInstance.addInteraction(draw);
+                setDrawInteraction(draw);
+
+                const snap = new Snap({ source: geofenceLayer.getSource()! });
+                mapInstance.addInteraction(snap);
+                setSnapInteraction(snap);
+
+                draw.on('drawend', (event) => {
+                    Swal.fire({
+                        title: "Insert the alert description below",
+                        input: "text",
+                        inputAttributes: {
+                          autocapitalize: "off"
+                        },
+                        showCancelButton: true,
+                        confirmButtonText: "Insert",
+                        showLoaderOnConfirm: true,
+                        preConfirm: async (alert_description) => {
+                          if (!alert_description) {
+                            Swal.showValidationMessage('Description is required');
+                            return false;
+                          }
+                          return alert_description;
+                        },
+                        allowOutsideClick: () => !Swal.isLoading()
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                            const newFeature = event.feature;
+
+                            // Step 1: Clone geometry and transform it to EPSG:4326 (WGS 84) from EPSG:3857 (Web Mercator)
+                            const transformedGeometry = newFeature
+                                .getGeometry()
+                                ?.clone()
+                                .transform('EPSG:3857', 'EPSG:4326'); // Transform the geometry
+                        
+                            // Step 2: Use WKT format to convert the geometry to Well-Known Text
+                            const wktFormat = new WKT();
+                            const wktString = wktFormat.writeGeometry(transformedGeometry);
+                            // Step 3: Create the newAlert object
+                            const newAlert = {
+                                geofence: wktString, // Directly use the GeoJSON object (no stringification here)
+                                time_start: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
+                                description: result.value, // Use the inserted description
+                            };
+                        
+                            // Send the message via WebSocket (send the newAlert as a stringified object)
+                            sendMessage(JSON.stringify(newAlert));
+                            Swal.fire({
+                                //position: "top-end",
+                                icon: "success",
+                                title: "Alert saved",
+                                showConfirmButton: false,
+                                timer: 1500
+                              });
+                        } else {
+                            geofenceLayer.getSource()?.removeFeature(event.feature);
+                        }
+                      });
+                });
+                
+            } else if (type === null) {
+                let drawInteractionInstance = undefined;
+                mapInstance.getInteractions().forEach((interaction) => {
+                    if (interaction instanceof Draw) {
+                        drawInteractionInstance = interaction;
+                    }
+                });
+                if (drawInteractionInstance) {
+                    mapInstance.removeInteraction(drawInteractionInstance);
+                }
+            }
+        },
+        [mapInstance, geofenceLayer]
+    );
 
     const enableEditing = useCallback(() => {
         if (!mapInstance || !geofenceLayer) return;
@@ -203,7 +273,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
 
     const toggleEditing = useCallback(() => {
         if (!mapInstance) return;
-        
+
         if (modifyInteraction) {
             mapInstance.removeInteraction(modifyInteraction);
             mapInstance.removeInteraction(snapInteraction);
@@ -215,7 +285,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
             setIsEditing(true);
         }
     }, [enableEditing, modifyInteraction, snapInteraction, mapInstance]);
-    
+
     const disableSelectInteraction = useCallback(() => {
         if (mapInstance && clickSelectInteraction && hoverSelectInteraction) {
             mapInstance.removeInteraction(clickSelectInteraction);
@@ -225,6 +295,39 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         }
     }, [mapInstance, clickSelectInteraction, hoverSelectInteraction]);
 
+    const updateGeofenceStyles = (userPositions: UserPosition[]) => {
+        if (!geofenceLayer) return;
+      
+        const source = geofenceLayer.getSource();
+        source?.getFeatures().forEach((feature) => {
+          const geometry = feature.getGeometry();
+          let userCount = 0;
+      
+          userPositions.forEach((user) => {
+            const userCoord = fromLonLat([user.geometry.coordinates[0], user.geometry.coordinates[1]]);
+            if (geometry?.intersectsCoordinate(userCoord)) {
+              userCount++;
+            }
+          });
+      
+          // Determine color based on user count
+          let fillColor: Color;
+          if (userCount === 0) fillColor = [0, 0, 255, 0.3]; // Green
+          else if (userCount <= 2) fillColor = [255, 255, 0, 0.3]; // Yellow
+          else fillColor = [255, 0, 0, 0.3]; // Red
+      
+          // Update feature style
+          feature.setStyle(
+            new Style({
+              fill: new Fill({ color: fillColor }),
+              stroke: new Stroke({ color: 'black', width: 1 }),
+            })
+          );
+        });
+      
+    };
+
+
     return {
         geofenceLayer,
         toggleEditing,
@@ -232,6 +335,7 @@ export default function useGeofences({ mapInstance }: UseGeofencesProps) {
         addInteraction,
         enableHoverPreview,
         enableClickSelection,
-        disableSelectInteraction
+        disableSelectInteraction,
+        updateGeofenceStyles,
     };
 }
