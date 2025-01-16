@@ -46,11 +46,12 @@ const MapScreen = () => {
             // Watch for location changes
             subscription = await Location.watchPositionAsync(
                 {
-                    accuracy: Location.Accuracy.Balanced,  //for privacy reasons, we don't need high accuracy
+                    accuracy: Location.Accuracy.High,  //for privacy reasons, we don't need high accuracy
                     timeInterval: 1000, // Update every 5 seconds
                     distanceInterval: 1, // Update when user moves at least 1 meter
                 },
                 (loc) => {
+                    console.log("Location updated");
                     const newLocation = {
                         lat: loc.coords.latitude,
                         lon: loc.coords.longitude,
@@ -70,7 +71,7 @@ const MapScreen = () => {
         return () => {
             if (subscription) subscription.remove();
         };
-    }, [activity]);
+    }, []);
 
     const determineActivity = (speed: number | null) => {
         if (speed === null || speed < 0.5) {
