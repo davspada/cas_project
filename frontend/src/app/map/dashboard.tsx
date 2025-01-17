@@ -19,14 +19,11 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (latestMessage) {
-    // console.log("code of latestMessage: "+latestMessage.code)
-    // console.log("position: "+latestMessage.position)
-    console.log("typeof lastestMessage: "+typeof latestMessage)
-    //console.log("code"+latestMessage["code"])
+
       switch (true) {
         case Array.isArray(latestMessage.users) && latestMessage.users.length > 0 &&
              Array.isArray(latestMessage.alerts) && latestMessage.alerts.length > 0:
-          console.log("Handling users and alerts message...");
+          //console.log("Handling users and alerts message...");
           // Transform the user data
           const transformedUserPositions = latestMessage.users.map((user: any) => ({
             type: "Feature",
@@ -55,24 +52,40 @@ const Dashboard = () => {
           let jsonMessage = JSON.parse(latestMessage)
           switch (true){
             case !!jsonMessage.code && !!jsonMessage.position:
-              console.log("Handling single user position message...");
-              const newUserPosition = {
-                type: "Feature",
-                geometry: {
-                  type: "Point",
-                  coordinates: [jsonMessage.position.lon, jsonMessage.position.lat],
-                },
-                properties: {
-                  id: jsonMessage.code,
-                  transportation_mode: jsonMessage.transport_method || "unknown",
-                },
-              };
-              setUserPositions((prevPositions) => [...prevPositions, newUserPosition]);
+              //console.log("Handling single user position message...");
+              const updatedUserPositions = userPositions.map((user) =>
+                user.properties.id === jsonMessage.code
+                  ? {
+                      ...user,
+                      geometry: {
+                        type: "Point",
+                        coordinates: [jsonMessage.position.lon, jsonMessage.position.lat],
+                      },
+                    }
+                  : user
+              );
+            
+              const userExists = userPositions.some((user) => user.properties.id === jsonMessage.code);
+            
+              if (!userExists) {
+                updatedUserPositions.push({
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [jsonMessage.position.lon, jsonMessage.position.lat],
+                  },
+                  properties: {
+                    id: jsonMessage.code,
+                    transportation_mode: jsonMessage.transport_method || "unknown",
+                  },
+                });
+              }
+            
+              setUserPositions(updatedUserPositions);
               break;
         
             default:
-              //console.warn("Unhandled message type:", latestMessage);
-              console.log("2nd default")
+              console.warn("Unhandled message type:", latestMessage);
           }
         default:
           console.warn("Unhandled message type:", latestMessage);

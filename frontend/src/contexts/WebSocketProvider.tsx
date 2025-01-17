@@ -33,7 +33,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
       try {
         // console.log("raw data: "+event.data)
         const data = JSON.parse(event.data);
-        console.log("data: "+data)
+        //console.log("data: "+data)
         setLatestMessage(data);
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
