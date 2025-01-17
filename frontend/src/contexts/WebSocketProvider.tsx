@@ -1,36 +1,47 @@
 "use client";
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 
 interface WebSocketContextType {
   sendMessage: (message: string) => void;
   isConnected: boolean;
-  latestMessage: any; // Holds the latest message received
+  latestMessage: any;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
 export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> = ({ url, children }) => {
   const wsRef = useRef<WebSocket | null>(null);
-  const isConnected = useRef(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [latestMessage, setLatestMessage] = useState<any>(null);
+
+  useEffect(() => {
+    if (latestMessage) {
+      console.log("Updated latestMessage:", latestMessage);
+    }
+  }, [latestMessage]);
 
   useEffect(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      isConnected.current = true;
+      setIsConnected(true);
       console.log("WebSocket connected");
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      //console.log("Message received:", data);
-      setLatestMessage(data); // Update the latest message state
+      try {
+        // console.log("raw data: "+event.data)
+        const data = JSON.parse(event.data);
+        console.log("data: "+data)
+        setLatestMessage(data);
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
     };
 
     ws.onclose = () => {
-      isConnected.current = false;
+      setIsConnected(false); // Update state reactively
       console.log("WebSocket disconnected");
     };
 
@@ -45,7 +56,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
   }, [url]);
 
   const sendMessage = (message: string) => {
-    if (wsRef.current && isConnected.current) {
+    if (wsRef.current && isConnected) {
       wsRef.current.send(message);
       console.log("Message sent:", message);
     } else {
@@ -54,7 +65,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
   };
 
   return (
-    <WebSocketContext.Provider value={{ sendMessage, isConnected: isConnected.current, latestMessage }}>
+    <WebSocketContext.Provider value={{ sendMessage, isConnected, latestMessage }}>
       {children}
     </WebSocketContext.Provider>
   );
