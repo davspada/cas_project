@@ -4,15 +4,13 @@ import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import useWebSocket from '@/hooks/useWebSocket';
 
-interface Message {
-    type: string;
-    content: string;
-}
-
 interface location_type {
-    lat: number;
-    lon: number;
-    speed: number | null;
+    code: string;
+    position: {
+        lat: number;
+        lon: number
+    },
+    //speed: number | null;
 }
 
 const MapScreen = () => {
@@ -36,12 +34,18 @@ const MapScreen = () => {
 
             // Get initial location
             const loc = await Location.getCurrentPositionAsync({});
+            const code = "test1";
             setLocation({
-                lat: loc.coords.latitude,
-                lon: loc.coords.longitude,
-                speed: loc.coords.speed,
-            });
+                code: String(code),
+                position: {
+                    lat: loc.coords.latitude,
+                    lon: loc.coords.longitude,
+                }
+                }
+                //speed: loc.coords.speed,
+            );
             setLoading(false);
+            console.log(location)
 
             // Watch for location changes
             subscription = await Location.watchPositionAsync(
@@ -52,18 +56,17 @@ const MapScreen = () => {
                 },
                 (loc) => {
                     console.log("Location updated");
-                    const newLocation = {
-                        lat: loc.coords.latitude,
-                        lon: loc.coords.longitude,
-                        speed: loc.coords.speed,
+                    const updatedLocation = {
+                        code: "test1",
+                        position: {
+                            lat: loc.coords.latitude,
+                            lon: loc.coords.longitude,
+                        }
+                        //speed: loc.coords.speed,
                     };
-                    setLocation(newLocation);
-                    determineActivity(newLocation.speed);
-                    websocket.sendMessage({
-                        code: 'test1',
-                        position: { lat: newLocation.lat, lon: newLocation.lon },
-                        transport_method: activity,
-                    });
+                    setLocation(updatedLocation);
+                    determineActivity(updatedLocation.speed);
+                    websocket.sendMessage(updatedLocation);
                 }
             );
         })();
@@ -95,14 +98,14 @@ const MapScreen = () => {
                     provider={PROVIDER_GOOGLE}
                     style={styles.map}
                     initialRegion={{
-                        latitude: location ? location.lat : 44.494887,
-                        longitude: location ? location.lon : 11.342616,
+                        latitude: location ? location.position.lat : 44.494887,
+                        longitude: location ? location.position.lon : 11.342616,
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421,
                     }}
                     region={location && {
-                        latitude: location.lat,
-                        longitude: location.lon,
+                        latitude: location.position.lat,
+                        longitude: location.position.lon,
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421,
                     }}
@@ -110,8 +113,8 @@ const MapScreen = () => {
                     {location && (
                         <Marker
                             coordinate={{
-                                latitude: location.lat,
-                                longitude: location.lon,
+                                latitude: location.position.lat,
+                                longitude: location.position.lon,
                             }}
                             title={`Activity: ${activity}`}
                             description={`Speed: ${location.speed?.toFixed(2) || 0} m/s`}

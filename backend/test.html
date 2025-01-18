@@ -88,6 +88,7 @@
                 lon: parseFloat(lon)
             }
             };
+            console.log(positionUpdate)
             socket.send(JSON.stringify(positionUpdate));
             addMessage(`Sent position update: lat=${lat}, lon=${lon}`);
         }
