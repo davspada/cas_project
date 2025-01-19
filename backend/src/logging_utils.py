@@ -39,7 +39,7 @@ class AdvancedLogger:
         # Create the logger
         logger = logging.getLogger(default_name)
         logger.setLevel(log_level)
-        logger.handlers.clear()  # Remove the default handler if it exists
+        logger.handlers.clear()
 
         # Formatter for the message format
         msg_format = logging.Formatter(
