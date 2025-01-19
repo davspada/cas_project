@@ -3,7 +3,7 @@ import { useWebSocketContext } from '@/contexts/WebSocketProvider';
 
 type OnMessageCallback = (data: unknown) => void;
 
-const useWebSocket = (onMessageCallback?: OnMessageCallback): WebSocketService => {
+const useWebSocket = (onMessageCallback?: OnMessageCallback) => {
   const websocketService = useWebSocketContext();
 
   useEffect(() => {
