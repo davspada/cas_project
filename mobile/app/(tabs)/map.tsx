@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
-import useWebSocket from '@/hooks/useWebSocket';
+import { useWebSocket } from '@/contexts/webSocketContext';
 
 interface location_type {
     code: string;
@@ -19,7 +19,7 @@ const MapScreen = () => {
     const [loading, setLoading] = useState(true);
     const [activity, setActivity] = useState<string>('Unknown');
     //const [speed, setSpeed] = useState<number | null>(0);
-    const websocket = useWebSocket();
+    const { messages, sendMessage } = useWebSocket() as { messages: any; sendMessage: (message: any) => void };
 
     useEffect(() => {
         let subscription;
@@ -71,7 +71,7 @@ const MapScreen = () => {
                         //speed: loc.coords.speed,
                     };
                     setLocation(updatedLocation);
-                    websocket.sendMessage(updatedLocation);
+                    sendMessage(updatedLocation);
                 }
             );
         })();
@@ -88,9 +88,9 @@ const MapScreen = () => {
         } else if (speed < 2) {
             activity = 'walking';
         } else if (speed < 5) {
-            activity = 'running';
+            activity = 'walking';
         } else {
-            activity = 'vehicle';
+            activity = 'car';
         }
         console.log('Determined Activity:', activity);
         setActivity(activity);

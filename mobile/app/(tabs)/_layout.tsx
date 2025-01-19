@@ -4,7 +4,7 @@ import React from 'react';
 import { TabBarIcon } from '@/components/navigation/TabBarIcon';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { WebSocketProvider } from '@/contexts/WebSocketProvider';
+import { WebSocketProvider } from '@/contexts/webSocketContext';
 
 //notifications imports
 import * as Device from 'expo-device';
@@ -23,7 +23,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <WebSocketProvider url='ws://10.0.2.2:8080'>
+    <WebSocketProvider>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,

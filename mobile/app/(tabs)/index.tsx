@@ -4,31 +4,27 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import useWebSocket from '@/hooks/useWebSocket';
-
-interface Message {
-  type: string;
-  content: string;
-}
+import { useWebSocket } from '@/contexts/webSocketContext';
 
 export default function LoginScreen() {
   const [code, setCode] = useState('');
   const [token, setToken] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
 
-  const websocket = useWebSocket((data) => {
-    console.log('Received WebSocket message:', data);
+  const { messages, sendMessage } = useWebSocket() as { messages: any[], sendMessage: (msg: any) => void };
+
+  // const websocket = useWebSocket((data) => {
+  //   //console.log('Received WebSocket message:', data);
   
-    if (data && typeof data === 'object' && 'type' in data) {
-      const message = data as Message;
-      if (message.type === 'token') {
-        const newToken = message.content;
-        setToken(newToken as string);
-        AsyncStorage.setItem('token', newToken as string);
-        Alert.alert('Token Received', `Your new token: ${newToken}`);
-      }
-    }
-  });
+  //   if (data && typeof data === 'object' && 'type' in data) {
+  //     const message = data as Message;
+  //     if (message.type === 'token') {
+  //       const newToken = message.content;
+  //       setToken(newToken as string);
+  //       AsyncStorage.setItem('token', newToken as string);
+  //       Alert.alert('Token Received', `Your new token: ${newToken}`);
+  //     }
+  //   }
+  // });
   
 
   const fetchStoredData = async () => {
@@ -56,10 +52,10 @@ export default function LoginScreen() {
     await AsyncStorage.setItem('code', code);
 
     if (token) {
-      websocket.sendMessage({ code, token });
+      sendMessage({ code, token });
       Alert.alert('Login Attempt', 'Code and token sent for validation.');
     } else {
-      websocket.sendMessage({ code });
+      sendMessage({ code });
       Alert.alert('Request Sent', 'Code sent to generate a token.');
     }
   };
@@ -92,7 +88,7 @@ export default function LoginScreen() {
         <View style={styles.messagesContainer}>
           <ThemedText type="subtitle">Messages from WebSocket:</ThemedText>
           {messages.map((msg, index) => (
-            <Text key={index}>{msg.content}</Text>
+          <Text key={index}>{JSON.stringify(msg)}</Text>
           ))}
         </View>
       </ThemedView>
