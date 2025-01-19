@@ -27,20 +27,20 @@ class WebSocketServer:
 
             if not code:
                 self.logger.warning("Invalid code in mobile connection")
-                self.connections.send_message(websocket, {"error": "Invalid code"})
+                await self.connections.send_message(websocket, {"error": "Invalid code"})
                 return
 
             row = await self.db.get_user_token(code)
             
             if row and row['token'] != mobile_token:
                 self.logger.warning(f"Invalid token for user {code}")
-                self.connections.send_message(websocket, {"error": "Invalid token"})
+                await self.connections.send_message(websocket, {"error": "Invalid token"})
                 return
             
             elif not row:
                 new_token = secrets.token_hex(16)
                 await self.db.create_user(code, new_token)
-                self.connections.send_message(websocket, {"token": new_token})
+                await self.connections.send_message(websocket, {"token": new_token})
 
             await self.db.update_user_connection(code, True)
             self.connections.add_mobile_connection(code, websocket)

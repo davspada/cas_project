@@ -5,11 +5,11 @@ CREATE EXTENSION IF NOT EXISTS postgis_topology;
 -- Create USERS table
 CREATE TABLE USERS (
     id SERIAL PRIMARY KEY,
-    code varchar(20) UNIQUE NOT NULL,
-    "token" varchar(20) UNIQUE NOT NULL,
+    code varchar(50) UNIQUE NOT NULL,
+    "token" varchar(50) UNIQUE NOT NULL,
     connected boolean NOT NULL,
     position public.geometry,
-    transport_method varchar(20)
+    transport_method varchar(50)
 );
 
 -- Create ALERTS table
