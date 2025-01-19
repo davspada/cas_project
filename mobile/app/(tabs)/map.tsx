@@ -18,6 +18,7 @@ const MapScreen = () => {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [activity, setActivity] = useState<string>('Unknown');
+    //const [speed, setSpeed] = useState<number | null>(0);
     const websocket = useWebSocket();
 
     useEffect(() => {
@@ -45,27 +46,31 @@ const MapScreen = () => {
                 //speed: loc.coords.speed,
             );
             setLoading(false);
-            console.log(location)
+            //setSpeed(loc.coords.speed);
+            //console.log(location)
 
             // Watch for location changes
             subscription = await Location.watchPositionAsync(
                 {
-                    accuracy: Location.Accuracy.High,  //for privacy reasons, we don't need high accuracy
-                    timeInterval: 1000, // Update every 5 seconds
-                    distanceInterval: 1, // Update when user moves at least 1 meter
+                    accuracy: Location.Accuracy.High,  //for privacy reasons, we don't need high accuracy, however it doesn't update properly with lower accuracy
+                    timeInterval: 1000, // update every second
+                    distanceInterval: 1, // update when user moves >= 1 meter
                 },
                 (loc) => {
-                    console.log("Location updated");
+                    console.log(loc.coords.speed);
+                    //setSpeed(loc.coords.speed);
+                    const currentActivity = determineActivity(loc.coords.speed);
+
                     const updatedLocation = {
                         code: "test1",
                         position: {
                             lat: loc.coords.latitude,
                             lon: loc.coords.longitude,
-                        }
+                        },
+                        transport_method: currentActivity
                         //speed: loc.coords.speed,
                     };
                     setLocation(updatedLocation);
-                    determineActivity(updatedLocation.speed);
                     websocket.sendMessage(updatedLocation);
                 }
             );
@@ -76,18 +81,21 @@ const MapScreen = () => {
         };
     }, []);
 
-    const determineActivity = (speed: number | null) => {
+    const determineActivity = (speed: number | null): string => {
+        let activity;
         if (speed === null || speed < 0.5) {
-            setActivity('still');
+            activity = 'walking'//'still';
         } else if (speed < 2) {
-            setActivity('walking');
+            activity = 'walking';
         } else if (speed < 5) {
-            setActivity('running');
+            activity = 'running';
         } else {
-            setActivity('vehicle');
+            activity = 'vehicle';
         }
-        console.log('Activity:', activity);
-    };
+        console.log('Determined Activity:', activity);
+        setActivity(activity);
+        return activity;
+    };    
 
     return (
         <View style={styles.container}>
