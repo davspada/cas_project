@@ -54,9 +54,13 @@ export default function LoginScreen() {
     if (token) {
       sendMessage({ code, token });
       Alert.alert('Login Attempt', 'Code and token sent for validation.');
+      setToken(token)
+      await AsyncStorage.setItem('token', token);
     } else {
       sendMessage({ code });
       Alert.alert('Request Sent', 'Code sent to generate a token.');
+      setCode(code)
+      await AsyncStorage.setItem('code', code);
     }
   };
 
