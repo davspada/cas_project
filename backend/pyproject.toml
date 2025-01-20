@@ -11,6 +11,8 @@ asyncpg = "^0.28.0"
 websockets = "^11.0.3"
 aiokafka = "^0.8.1"
 typing-extensions = "^4.8.0"
+shapely = "^2.0.6"
+pyproj = "^3.7.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.4.3"

@@ -23,7 +23,7 @@ class AdvancedLogger:
     def get_logger(
         cls,
         directory_log: Optional[str] = None,
-        log_level: Union[int, str] = logging.INFO,
+        log_level: Union[int, str] = logging.DEBUG,
         max_size_log: int = 5 * 1024 * 1024,  # 5MB
         backup_number: int = 5
     ) -> logging.Logger:
