@@ -1,8 +1,9 @@
 import asyncio
 import json
-from logging import Logger
+
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from backend.src.connection_manager import ConnectionManager
+from connection_manager import ConnectionManager
+from logging import Logger
 from logging_utils import AdvancedLogger
 
 class KafkaManager:
@@ -25,19 +26,19 @@ class KafkaManager:
         
         Args:
         - bootstrap_servers (str): Kafka broker addresses
-        - connection_manager: ConnectionManager: Instance of ConnectionManager for WebSocket communications
+        - connection_manager (ConnectionManager): Instance of ConnectionManager for WebSocket communications
         """
         # Store Kafka broker addresses for connection
         self.bootstrap_servers: str = bootstrap_servers
-        # Store reference to WebSocket connection manager
+        # Store connection manager for message routing
         self.connection_manager: ConnectionManager = connection_manager
         # Initialize logger for Kafka operations
         self.logger: Logger = AdvancedLogger.get_logger()
-        # Initialize consumer and producer as None until start() is called
-        self.consumer: AIOKafkaConsumer = None
-        self.producer: AIOKafkaProducer = None
+        # Initialize consumer and producer instances
+        self.consumer: AIOKafkaConsumer | None = None
+        self.producer: AIOKafkaProducer | None = None
 
-    async def start(self):
+    async def start(self) -> None:
         """
         Start Kafka consumer and producer services.
         
@@ -46,21 +47,21 @@ class KafkaManager:
         Starts the background listening task for processing incoming messages.
         
         Raises:
-            Exception: If Kafka services fail to start
+        - Exception: If Kafka services fail to start
         """
         try:
             self.logger.info("Starting Kafka consumer and producer...")
             
-            # Initialize consumer with topic subscriptions and JSON deserializer
+            # Initialize Kafka consumer with topics and deserializer
             self.consumer = AIOKafkaConsumer(
                 'alert-updates', 'user-updates', 'users-in-danger',
                 bootstrap_servers=self.bootstrap_servers,
-                auto_offset_reset='latest',  # Only process new messages
+                auto_offset_reset='latest',
                 value_deserializer=lambda v: json.loads(v.decode('utf-8'))
             )
             await self.consumer.start()
 
-            # Initialize producer with JSON serializer
+            # Initialize Kafka producer with serializer
             self.producer = AIOKafkaProducer(
                 bootstrap_servers=self.bootstrap_servers,
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
@@ -69,14 +70,14 @@ class KafkaManager:
             
             self.logger.info("Kafka consumer and producer started successfully")
             
-            # Start background task for message processing
+            # Start listening for incoming messages
             asyncio.create_task(self.listen())
 
         except Exception as e:
             self.logger.exception("Failed to manage Kafka services")
             raise
 
-    async def listen(self):
+    async def listen(self) -> None:
         """
         Listen for and process incoming Kafka messages.
         
@@ -84,28 +85,29 @@ class KafkaManager:
         WebSocket connections based on the message topic and content.
         
         Message routing:
-        - alert-updates: Sent to all frontend and mobile connections
-        - users-in-danger: Sent to specific mobile user based on user code
-        - user-updates: Sent to all frontend connections
+        1. alert-updates: Sent to all frontend and mobile connections
+        2. users-in-danger: Sent to specific mobile user based on user code
+        3. user-updates: Sent to all frontend connections
         """
         async for message in self.consumer:
             self.logger.info(f"Received message from topic {message.topic}")
             
-            # Use pattern matching to handle different message topics
+            # Route messages based on topic
             match message.topic:
                 case 'alert-updates':
-                    # Broadcast alert updates to all connections
+                    # Broadcast alert updates to all frontend and mobile connections
                     for frontend in self.connection_manager.get_frontend_connections():
                         await self.connection_manager.send_message(frontend, message.value)
-                    
-                    for mobile in self.connection_manager.get_mobile_connections():
-                        await self.connection_manager.send_message(mobile, message.value)
-                
-                case 'users-in-danger':
-                    # Parse the message to extract user code and content
-                    parts: str = message.value.split(", message: ")
 
-                    # Find the specific mobile user and send them the danger alert
+                    # TODO: Reactivate mobile alerts if needed
+                    # for mobile in self.connection_manager.get_mobile_connections():
+                    #     await self.connection_manager.send_message(mobile, message.value)
+
+                case 'users-in-danger':
+                    # Send danger notifications to specific mobile user based on user code
+                    parts: list[str] = message.value.split(", message: ")
+
+                    # Find the mobile connection based on user code
                     for mobile in self.connection_manager.get_mobile_code():
                         if mobile == parts[0].split("code: ")[1].strip():
                             await self.connection_manager.send_message(
@@ -113,17 +115,15 @@ class KafkaManager:
                                 parts[1].strip()
                             )
                             break
-                    
                 case 'user-updates':
                     # Broadcast user updates to all frontend connections
                     for frontend in self.connection_manager.get_frontend_connections():
-                        self.connection_manager.send_message(frontend, message.value)
-                
+                        await self.connection_manager.send_message(frontend, message.value)
                 case _:
-                    # Log unknown topics for debugging
+                    # Log messages from unknown topics
                     self.logger.warning(f"Received message from unknown topic: {message.topic}")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """
         Stop Kafka consumer and producer services.
         
@@ -136,7 +136,7 @@ class KafkaManager:
             await self.producer.stop()
         self.logger.info("Kafka consumer and producer stopped")
 
-    async def send_message(self, topic: str, message: str):
+    async def send_message(self, topic: str, message: str) -> None:
         """
         Send a message to a specific Kafka topic.
         
@@ -145,3 +145,13 @@ class KafkaManager:
         - message (str): The message content to be serialized and sent
         """
         await self.producer.send_and_wait(topic, json.dumps(message), partition=0)
+
+    async def is_running(self) -> bool:
+        """
+        Check if the Kafka consumer and producer are running.
+        
+        Returns:
+        - bool: True if both consumer and producer are running, False otherwise
+        """
+        return self.consumer is not None and self.producer is not None
+    
