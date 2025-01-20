@@ -2,10 +2,38 @@ import asyncpg
 from logging_utils import AdvancedLogger
 
 class DatabaseManager:
+    """
+    Manages PostgreSQL database operations for the real-time tracking system.
+    
+    This class handles all database interactions including:
+        - User management (creation, updates, queries)
+        - Alert management (creation, updates, queries)
+        - Geospatial operations using PostGIS
+        - Connection pooling and lifecycle management
+    
+    The manager uses asyncpg for asynchronous database operations and supports
+    PostGIS geometry types for location-based queries.
+    """
+
     def __init__(self, config):
+        """
+        Initialize the database manager with configuration settings.
+        
+        Args:
+            config (dict): Database configuration parameters including:
+                - host: Database server hostname
+                - port: Database server port
+                - database: Database name
+                - user: Database username
+                - password: Database password
+        """
+        # Store database configuration
         self.config = config
+        # Initialize logger for database operations
         self.logger = AdvancedLogger.get_logger()
+        # Connection pool (initialized in connect())
         self.pool = None
+        # Predefined alert messages for different danger zones
         self.messages = {
             "inside": "URGENT! You are in a",
             "in_1km": "ALERT! You are within 1km of a",
@@ -13,6 +41,13 @@ class DatabaseManager:
         }
 
     async def connect(self):
+        """
+        Establish connection pool to the database.
+        Creates a connection pool using the provided configuration settings.
+        
+        Raises:
+            Exception: If connection to database fails
+        """
         try:
             self.logger.info("Connecting to database...")
             self.pool = await asyncpg.create_pool(**self.config)
@@ -22,17 +57,35 @@ class DatabaseManager:
             raise
 
     async def close(self):
+        """
+        Gracefully close the database connection pool.
+        """
         if self.pool:
             await self.pool.close()
 
     async def update_user_location(self, code, position):
+        """
+        Update a user's geographic position.
+        
+        Args:
+            code (str): User's unique identifier
+            position (dict): Dictionary containing 'lat' and 'lon' coordinates
+        """
         async with self.pool.acquire() as conn:
+            # Create PostGIS point geometry from coordinates
             await conn.execute(
                 "UPDATE USERS SET position = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE code = $3",
                 position['lon'], position['lat'], code
             )
 
     async def update_transport_method(self, code, transport_method):
+        """
+        Update a user's transport method.
+        
+        Args:
+            code (str): User's unique identifier
+            transport_method (str): User's current mode of transport
+        """
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE USERS SET transport_method = $1 WHERE code = $2",
@@ -40,10 +93,26 @@ class DatabaseManager:
             )
 
     async def get_user_token(self, code):
+        """
+        Retrieve a user's authentication token.
+        
+        Args:
+            code (str): User's unique identifier
+            
+        Returns:
+            Record: Database record containing user's token
+        """
         async with self.pool.acquire() as conn:
             return await conn.fetchrow("SELECT token FROM USERS WHERE code = $1", code)
 
     async def create_user(self, code, token):
+        """
+        Create a new user record.
+        
+        Args:
+            code (str): User's unique identifier
+            token (str): Authentication token for the user
+        """
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "INSERT INTO USERS (code, token, connected) VALUES ($1, $2, false)",
@@ -51,6 +120,13 @@ class DatabaseManager:
             )
 
     async def update_user_connection(self, code, connected):
+        """
+        Update a user's connection status.
+        
+        Args:
+            code (str): User's unique identifier
+            connected (bool): Whether the user is currently connected
+        """
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE USERS SET connected = $1 WHERE code = $2",
@@ -58,7 +134,14 @@ class DatabaseManager:
             )
 
     async def get_connected_users(self):
+        """
+        Retrieve all currently connected users with their positions.
+        
+        Returns:
+            List[Record]: List of connected users with their positions and transport methods
+        """
         async with self.pool.acquire() as conn:
+            # Only return users with complete information
             return await conn.fetch("""
                 SELECT code, ST_AsGeoJSON("position"), transport_method 
                 FROM USERS 
@@ -68,6 +151,12 @@ class DatabaseManager:
             """)
 
     async def get_active_alerts(self):
+        """
+        Retrieve all active (non-ended) alerts.
+        
+        Returns:
+            List[Record]: List of active alerts with their geofences and details
+        """
         async with self.pool.acquire() as conn:
             return await conn.fetch("""
                 SELECT id, ST_AsGeoJSON("geofence"), time_start, description 
@@ -76,6 +165,13 @@ class DatabaseManager:
             """)
 
     async def update_alert(self, time_end, geofence):
+        """
+        Update an alert's end time.
+        
+        Args:
+            time_end (datetime): When the alert ends
+            geofence (str): WKT representation of the alert's geometry
+        """
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE ALERTS SET time_end = $1 WHERE geofence = $2",
@@ -83,14 +179,38 @@ class DatabaseManager:
             )
 
     async def create_alert(self, geofence, time_start, description):
+        """
+        Create a new alert.
+        
+        Args:
+            geofence (str): WKT representation of the alert's geometry
+            time_start (datetime): When the alert starts
+            description (str): Description of the alert
+        """
         async with self.pool.acquire() as conn:
+            # Convert WKT to PostGIS geometry
             await conn.execute(
                 "INSERT INTO ALERTS (geofence, time_start, description) VALUES (ST_GeomFromText($1, 4326), $2, $3)",
                 geofence, time_start, description
             )
 
     async def check_users_in_danger(self, data):
+        """
+        Check for users within different danger zones of an alert.
+        
+        Performs spatial queries to find users:
+        - Inside the alert area
+        - Within 1km of the alert area
+        - Within 2km of the alert area
+        
+        Args:
+            data (dict): Alert data containing geofence and description
+            
+        Returns:
+            List[str]: Messages for users in danger zones
+        """
         async with self.pool.acquire() as conn:
+            # Define queries for different danger zones using PostGIS functions
             query_templates = {
                 'inside': """
                     SELECT code
@@ -127,6 +247,7 @@ class DatabaseManager:
             
             messages = []
 
+            # Check each danger zone and generate appropriate messages
             for zone, query in query_templates.items():
                 for user in await conn.fetch(query, data["geofence"]):
                     messages.append(
