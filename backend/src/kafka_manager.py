@@ -1,6 +1,8 @@
 import asyncio
 import json
+from logging import Logger
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from backend.src.connection_manager import ConnectionManager
 from logging_utils import AdvancedLogger
 
 class KafkaManager:
@@ -12,28 +14,28 @@ class KafkaManager:
     to appropriate WebSocket connections based on message type.
     
     Topics handled:
-        - alert-updates: Alert creation and modifications
-        - user-updates: User location and transport method changes
-        - users-in-danger: Notifications for users in danger zones
+    - alert-updates: Alert creation and modifications
+    - user-updates: User location and transport method changes
+    - users-in-danger: Notifications for users in danger zones
     """
 
-    def __init__(self, bootstrap_servers, connection_manager):
+    def __init__(self, bootstrap_servers: str, connection_manager: ConnectionManager):
         """
         Initialize the Kafka manager with server configuration and connection management.
         
         Args:
-            bootstrap_servers (str): Kafka broker addresses
-            connection_manager: Instance of ConnectionManager for WebSocket communications
+        - bootstrap_servers (str): Kafka broker addresses
+        - connection_manager: ConnectionManager: Instance of ConnectionManager for WebSocket communications
         """
         # Store Kafka broker addresses for connection
-        self.bootstrap_servers = bootstrap_servers
+        self.bootstrap_servers: str = bootstrap_servers
         # Store reference to WebSocket connection manager
-        self.connection_manager = connection_manager
+        self.connection_manager: ConnectionManager = connection_manager
         # Initialize logger for Kafka operations
-        self.logger = AdvancedLogger.get_logger()
+        self.logger: Logger = AdvancedLogger.get_logger()
         # Initialize consumer and producer as None until start() is called
-        self.consumer = None
-        self.producer = None
+        self.consumer: AIOKafkaConsumer = None
+        self.producer: AIOKafkaProducer = None
 
     async def start(self):
         """
@@ -82,9 +84,9 @@ class KafkaManager:
         WebSocket connections based on the message topic and content.
         
         Message routing:
-            - alert-updates: Sent to all frontend and mobile connections
-            - users-in-danger: Sent to specific mobile user based on user code
-            - user-updates: Sent to all frontend connections
+        - alert-updates: Sent to all frontend and mobile connections
+        - users-in-danger: Sent to specific mobile user based on user code
+        - user-updates: Sent to all frontend connections
         """
         async for message in self.consumer:
             self.logger.info(f"Received message from topic {message.topic}")
@@ -101,7 +103,7 @@ class KafkaManager:
                 
                 case 'users-in-danger':
                     # Parse the message to extract user code and content
-                    parts = message.value.split(", message: ")
+                    parts: str = message.value.split(", message: ")
 
                     # Find the specific mobile user and send them the danger alert
                     for mobile in self.connection_manager.get_mobile_code():
@@ -134,12 +136,12 @@ class KafkaManager:
             await self.producer.stop()
         self.logger.info("Kafka consumer and producer stopped")
 
-    async def send_message(self, topic, message):
+    async def send_message(self, topic: str, message: str):
         """
         Send a message to a specific Kafka topic.
         
         Args:
-            topic (str): The Kafka topic to send the message to
-            message: The message content to be serialized and sent
+        - topic (str): The Kafka topic to send the message to
+        - message (str): The message content to be serialized and sent
         """
         await self.producer.send_and_wait(topic, json.dumps(message), partition=0)

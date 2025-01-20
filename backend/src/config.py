@@ -1,6 +1,6 @@
-'''
+"""
 This file contains the configuration for the backend.
-'''
+"""
 
 # Database configuration
 DB_CONFIG = {

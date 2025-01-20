@@ -1,11 +1,15 @@
+from ast import Module
 import asyncio
 import json
+from logging import Logger
 import secrets
 from datetime import datetime
+from typing import Any
 
+import asyncpg
 import websockets
 from config import DB_CONFIG, KAFKA_HOST
-from database import DatabaseManager
+from backend.src.database_manager import DatabaseManager
 from kafka_manager import KafkaManager
 from connection_manager import ConnectionManager
 from logging_utils import AdvancedLogger
@@ -28,34 +32,34 @@ class WebSocketServer:
         Sets up logging, connection management, database connection, and Kafka integration.
         """
         # Set up logging for server operations
-        self.logger = AdvancedLogger.get_logger()
+        self.logger: Logger = AdvancedLogger.get_logger()
         # Initialize connection manager to track active WebSocket connections
-        self.connections = ConnectionManager()
+        self.connections: ConnectionManager = ConnectionManager()
         # Set up database connection with configured parameters
-        self.db = DatabaseManager(DB_CONFIG)
+        self.db: DatabaseManager = DatabaseManager(DB_CONFIG)
         # Initialize Kafka manager for message broadcasting
-        self.kafka = KafkaManager(KAFKA_HOST, self.connections)
+        self.kafka: KafkaManager = KafkaManager(KAFKA_HOST, self.connections)
 
-    async def handle_mobile(self, websocket, path):
+    async def handle_mobile(self, websocket: websockets.WebSocketServerProtocol, path):
         """
         Handle WebSocket connections from mobile clients.
         
         This method manages the lifecycle of mobile client connections, including:
-        - User authentication using codes and tokens
-        - Location and transport method updates
-        - Connection state management
+        1. User authentication using codes and tokens
+        2. Location and transport method updates
+        3. Connection state management
         
         Args:
-            websocket: The WebSocket connection object
-            path: The connection path (unused but required by websockets library)
+        - websocket (websockets.WebSocketServerProtocol): The WebSocket connection object
+        - path: The connection path (unused but required by websockets library)
         """
-        code = None
         try:
             # Get initial connection message containing auth details
-            message = await websocket.recv()
-            data = json.loads(message)
-            code = data.get('code')
-            mobile_token = data.get('token')
+            code: str = None
+            message: str = await websocket.recv()
+            data: json = json.loads(message)
+            code: str = data.get('code')
+            mobile_token: str = data.get('token')
 
             # Validate user code
             if not code:
@@ -64,7 +68,7 @@ class WebSocketServer:
                 return
 
             # Check if user exists and validate token
-            row = await self.db.get_user_token(code)
+            row: asyncpg.Record = await self.db.get_user_token(code)
             
             # If user exists but token doesn't match, reject connection
             if row and row['token'] != mobile_token:
@@ -74,7 +78,7 @@ class WebSocketServer:
             
             # If new user, create account and generate token
             elif not row:
-                new_token = secrets.token_hex(16)
+                new_token: str = secrets.token_hex(16)
                 await self.db.create_user(code, new_token)
                 await self.connections.send_message(websocket, {"token": new_token})
 
@@ -85,7 +89,7 @@ class WebSocketServer:
 
             # Main message processing loop
             async for message in websocket:
-                data = json.loads(message)
+                data: str = json.loads(message)
                 # Handle location updates
                 if 'position' in data:
                     await self.db.update_user_location(code, data['position'])
@@ -105,20 +109,19 @@ class WebSocketServer:
                 await self.db.update_user_connection(code, False)
                 self.logger.info(f"User {code} disconnected")
 
-    async def handle_frontend(self, websocket, path):
+    async def handle_frontend(self, websocket: websockets.WebSocketServerProtocol, path):
         """
         Handle WebSocket connections from frontend applications.
         
         This method manages the frontend interface connections, including:
-        - Initial data synchronization
-        - Real-time updates via Kafka
-        - Alert creation and management
+        1. Initial data synchronization
+        2. Real-time updates via Kafka
+        3. Alert creation and management
         
         Args:
-            websocket: The WebSocket connection object
-            path: The connection path (unused but required by websockets library)
+        - websocket (websockets.WebSocketServerProtocol): The WebSocket connection object
+        - path: The connection path (unused but required by websockets library)
         """
-        kafka_task = None
         try:
             # Define internal Kafka message handler
             async def kafka_handler():
@@ -134,17 +137,19 @@ class WebSocketServer:
             self.logger.info("Frontend connected, sending all data...")
 
             # Fetch initial state data
-            users = await self.db.get_connected_users()
-            alerts = await self.db.get_active_alerts()
+            users: list[asyncpg.Record] = await self.db.get_connected_users()
+            alerts: list[asyncpg.Record] = await self.db.get_active_alerts()
 
-            def serialize_data(item):
-                """Helper function to serialize datetime objects for JSON encoding."""
+            def serialize_data(item: Any) -> str:
+                """
+                Helper function to serialize datetime objects for JSON encoding.
+                """
                 if isinstance(item, datetime):
                     return item.isoformat()
                 return item
 
             # Prepare initial state response
-            response = {
+            response: Module = {
                 "users": [
                     {key: serialize_data(value) for key, value in dict(row).items()} 
                     for row in users
@@ -161,11 +166,11 @@ class WebSocketServer:
             self.logger.info("All data sent to frontend, listening for updates...")
 
             # Start Kafka consumer task
-            kafka_task = asyncio.create_task(kafka_handler())
+            kafka_task: asyncio.Task = asyncio.create_task(kafka_handler())
             
             # Main message processing loop
             async for message in websocket:
-                data = json.loads(message)
+                data: str = json.loads(message)
                 # Handle alert end time updates
                 if 'time_end' in data:
                     await self.db.update_alert(data['time_end'], data['geofence'])
@@ -174,7 +179,7 @@ class WebSocketServer:
                 elif 'geofence' in data:
                     try:
                         # Convert ISO format datetime to native datetime
-                        formatted_date = datetime.fromisoformat(
+                        formatted_date: datetime = datetime.fromisoformat(
                             data['time_start'].replace("Z", "+00:00")
                         ).replace(tzinfo=None)
                     except ValueError:
@@ -209,9 +214,9 @@ class WebSocketServer:
         2. Frontend server for administrative interfaces
         
         Args:
-            host (str): The hostname to bind to
-            port (int): The port number for the mobile server
-                       (frontend server will use port + 1)
+        - host (str): The hostname to bind to
+        - port (int): The port number for the mobile server
+                      (frontend server will use port + 1)
         """
         try:
             self.logger.info("Starting WebSocket server...")
@@ -223,8 +228,8 @@ class WebSocketServer:
             self.logger.info("Starting mobile and frontend WebSocket servers...")
 
             # Start both WebSocket servers
-            server_mobile = await websockets.serve(self.handle_mobile, host, port)
-            server_frontend = await websockets.serve(self.handle_frontend, host, port + 1)
+            server_mobile: websockets.WebSocketServerProtocol = await websockets.serve(self.handle_mobile, host, port)
+            server_frontend: websockets.WebSocketServerProtocol = await websockets.serve(self.handle_frontend, host, port + 1)
 
             self.logger.info(f"Mobile WebSocket server listening on ws:{host}:{port}")
             self.logger.info(f"Frontend WebSocket server listening on ws:{host}:{port + 1}")
