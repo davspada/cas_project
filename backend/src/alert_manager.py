@@ -109,21 +109,22 @@ class AlertManager:
                 self.logger.error(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
                 return
 
-            # Cache the new alert
-            self.alert_cache.append({
-                "geofence": polygon,
-                "time_start": alert['time_start'],
-                "description": alert['description']
-            })
+            if alert['geofence'] not in [present['geofence'] for present in self.alert_cache]:
+                # Cache the new alert
+                self.alert_cache.append({
+                    "geofence": polygon,
+                    "time_start": alert['time_start'],
+                    "description": alert['description']
+                })
 
-            # Create the alert in the database and broadcast the update message
-            await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                # Create the alert in the database and broadcast the update message
+                await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
 
-            # Notify affected users
-            await self.kafka.send_message('alert-updates', alert)
-            for user_code, zone in await self.db.check_users_in_danger(alert):
-                await self.notify_users(user_code, zone, alert['description'])
-                self.user_in_danger[(user_code, alert['geofence'])] = zone
+                # Notify affected users
+                await self.kafka.send_message('alert-updates', alert)
+                for user_code, zone in await self.db.check_users_in_danger(alert):
+                    await self.notify_users(user_code, zone, alert['description'])
+                    self.user_in_danger[(user_code, alert['geofence'])] = zone
 
     async def process_user_update(self, code: str, position: Dict[str, float]) -> None:
         """
