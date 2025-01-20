@@ -3,6 +3,7 @@ import { StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useWebSocket } from '@/contexts/webSocketContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface location_type {
     code: string;
@@ -17,10 +18,23 @@ const MapScreen = () => {
     const [location, setLocation] = useState<location_type | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activity, setActivity] = useState<string>('Unknown');
+    const [activity, setActivity] = useState<string>('walking');
     //const [speed, setSpeed] = useState<number | null>(0);
     const { messages, sendMessage } = useWebSocket() as { messages: any; sendMessage: (message: any) => void };
-
+    
+    const _retrieveData = async () => {
+        try {
+          const value = await AsyncStorage.getItem('code');
+          if (value !== null) {
+            // We have data!!
+            console.log("retrieved code: "+value);
+            return value;
+          }
+        } catch (error) {
+          // Error retrieving data
+        }
+      };
+        
     useEffect(() => {
         let subscription;
 
@@ -32,12 +46,12 @@ const MapScreen = () => {
                 setLoading(false);
                 return;
             }
+            const code = (await _retrieveData()) || '';
 
             // Get initial location
             const loc = await Location.getCurrentPositionAsync({});
-            const code = "test1";
             setLocation({
-                code: String(code),
+                code: code!,
                 position: {
                     lat: loc.coords.latitude,
                     lon: loc.coords.longitude,
@@ -62,7 +76,7 @@ const MapScreen = () => {
                     const currentActivity = determineActivity(loc.coords.speed);
 
                     const updatedLocation = {
-                        code: "test1",
+                        code: code,
                         position: {
                             lat: loc.coords.latitude,
                             lon: loc.coords.longitude,

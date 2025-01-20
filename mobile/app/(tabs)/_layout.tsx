@@ -38,7 +38,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="notifications"
         options={{
           title: 'Notifications',
@@ -46,20 +46,11 @@ export default function TabLayout() {
             <TabBarIcon name={focused ? 'code-slash' : 'code-slash-outline'} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? 'map' : 'map-outline'} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="socket_test"
-        options={{
-          title: 'socket',
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon name={focused ? 'map' : 'map-outline'} color={color} />
           ),

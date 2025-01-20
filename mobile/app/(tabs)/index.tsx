@@ -39,6 +39,15 @@ export default function LoginScreen() {
   };
 
   useEffect(() => {
+    const newToken = messages.find(msg => msg.type === 'token')?.content;
+    if (newToken) {
+      setToken(newToken);
+      AsyncStorage.setItem('token', newToken);
+      Alert.alert('Token Received', `Your new token: ${newToken}`);
+    }
+  }, [messages]);
+  
+  useEffect(() => {
     // Fetch saved data when component mounts
     fetchStoredData();
   }, []);
