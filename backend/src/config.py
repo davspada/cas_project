@@ -1,3 +1,8 @@
+"""
+This file contains the configuration for the backend.
+"""
+
+# Database configuration
 DB_CONFIG = {
     "host": "postgis",
     "database": "mydb",
@@ -5,4 +10,5 @@ DB_CONFIG = {
     "password": "password"
 }
 
+# Kafka configuration
 KAFKA_HOST = 'kafka:9092'
