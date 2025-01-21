@@ -14,11 +14,12 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
   const [isConnected, setIsConnected] = useState(false);
   const [latestMessage, setLatestMessage] = useState<any>(null);
 
-  useEffect(() => {
-    if (latestMessage) {
-      console.log("Updated latestMessage:", latestMessage);
-    }
-  }, [latestMessage]);
+  //used for debug purposes
+  // useEffect(() => {
+  //   if (latestMessage) {
+  //     console.log("Updated latestMessage:", latestMessage);
+  //   }
+  // }, [latestMessage]);
 
   useEffect(() => {
     const ws = new WebSocket(url);
@@ -58,7 +59,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
   const sendMessage = (message: string) => {
     if (wsRef.current && isConnected) {
       wsRef.current.send(message);
-      console.log("Message sent:", message);
+      //console.log("Message sent:", message);
     } else {
       console.warn("WebSocket is not connected");
     }

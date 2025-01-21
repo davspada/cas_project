@@ -31,7 +31,6 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
     const [clickSelectInteraction, setClickSelectInteraction] = useState<Select | null>(null);
 
     const { sendMessage, isConnected, latestMessage } = useWebSocket();
-
     useEffect(() => {
         if (!mapInstance) return;
 
@@ -234,6 +233,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                                 showConfirmButton: false,
                                 timer: 1500
                               });
+                            
                         } else {
                             geofenceLayer.getSource()?.removeFeature(event.feature);
                         }

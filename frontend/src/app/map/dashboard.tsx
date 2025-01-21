@@ -47,10 +47,12 @@ const Dashboard = () => {
           }));
           setAlerts(transformedAlerts);
           break;
-    
-        case typeof latestMessage == "string":
+
+          //no array, string incoming
+          case typeof latestMessage == "string":
           let jsonMessage = JSON.parse(latestMessage)
           switch (true){
+            //single user position update
             case !!jsonMessage.code && !!jsonMessage.position:
               //console.log("Handling single user position message...");
               const updatedUserPositions = userPositions.map((user) =>
@@ -83,12 +85,27 @@ const Dashboard = () => {
             
               setUserPositions(updatedUserPositions);
               break;
-        
+
+            //single alert  
+            case !!jsonMessage.id && !!jsonMessage.st_asgeojson:
+              console.log("new alert")
+              const new_alert = {
+                type: "Feature",
+                geometry: JSON.parse(jsonMessage.st_asgeojson),
+                properties: {
+                  id: jsonMessage.id,
+                  time_start: jsonMessage.time_start,
+                  description: jsonMessage.description,
+                },
+              };
+              const updated_alerts = [...alerts, new_alert];
+              setAlerts(updated_alerts);
+                            
             default:
-              console.warn("Unhandled message type:", latestMessage);
+              //console.log("Unhandled message type:", latestMessage);
           }
         default:
-          console.warn("Unhandled message type:", latestMessage);
+          //console.log("Unhandled message type:", latestMessage);
       }
     }    
   }, [latestMessage]);
