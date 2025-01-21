@@ -19,33 +19,78 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (latestMessage) {
-      console.log("New data from WebSocket:", latestMessage);
 
-      // Transform the user data
-      const transformedUserPositions = latestMessage.users.map((user: any) => ({
-        type: "Feature",
-        geometry: JSON.parse(user.st_asgeojson),
-        properties: {
-          id: user.code, // Use `code` as the unique identifier
-          transportation_mode: user.transport_method,
-        },
-      }));
-
-      setUserPositions(transformedUserPositions);
-
-      // Transform the alert data
-      const transformedAlerts = latestMessage.alerts.map((alert: any) => ({
-        type: "Feature",
-        geometry: JSON.parse(alert.st_asgeojson),
-        properties: {
-          id: alert.id,
-          time_start: alert.time_start,
-          description: alert.description,
-        },
-      }));
-
-      setAlerts(transformedAlerts);
-    }
+      switch (true) {
+        case Array.isArray(latestMessage.users) && latestMessage.users.length > 0 &&
+             Array.isArray(latestMessage.alerts) && latestMessage.alerts.length > 0:
+          //console.log("Handling users and alerts message...");
+          // Transform the user data
+          const transformedUserPositions = latestMessage.users.map((user: any) => ({
+            type: "Feature",
+            geometry: JSON.parse(user.st_asgeojson),
+            properties: {
+              id: user.code,
+              transportation_mode: user.transport_method,
+            },
+          }));
+          setUserPositions(transformedUserPositions);
+    
+          // Transform the alert data
+          const transformedAlerts = latestMessage.alerts.map((alert: any) => ({
+            type: "Feature",
+            geometry: JSON.parse(alert.st_asgeojson),
+            properties: {
+              id: alert.id,
+              time_start: alert.time_start,
+              description: alert.description,
+            },
+          }));
+          setAlerts(transformedAlerts);
+          break;
+    
+        case typeof latestMessage == "string":
+          let jsonMessage = JSON.parse(latestMessage)
+          switch (true){
+            case !!jsonMessage.code && !!jsonMessage.position:
+              //console.log("Handling single user position message...");
+              const updatedUserPositions = userPositions.map((user) =>
+                user.properties.id === jsonMessage.code
+                  ? {
+                      ...user,
+                      geometry: {
+                        type: "Point",
+                        coordinates: [jsonMessage.position.lon, jsonMessage.position.lat],
+                      },
+                    }
+                  : user
+              );
+            
+              const userExists = userPositions.some((user) => user.properties.id === jsonMessage.code);
+            
+              if (!userExists) {
+                updatedUserPositions.push({
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [jsonMessage.position.lon, jsonMessage.position.lat],
+                  },
+                  properties: {
+                    id: jsonMessage.code,
+                    transportation_mode: jsonMessage.transport_method || "unknown",
+                  },
+                });
+              }
+            
+              setUserPositions(updatedUserPositions);
+              break;
+        
+            default:
+              console.warn("Unhandled message type:", latestMessage);
+          }
+        default:
+          console.warn("Unhandled message type:", latestMessage);
+      }
+    }    
   }, [latestMessage]);
 
   useEffect(() => {

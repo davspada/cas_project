@@ -189,9 +189,9 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
             fontSize: "14px",
           }}
         >
-          {drawingType === "Polygon" ? "Stop Drawing Polygon" : "Draw Polygon"}
+          {drawingType === "Polygon" ? "Stop Drawing Alert" : "Draw Alert"}
         </button>
-        <button
+        {/* <button
           onClick={() => setDrawingType(drawingType === "Circle" ? null : "Circle")}
           disabled={drawingType === "Polygon" || isEditing}
           style={{
@@ -220,7 +220,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
           }}
         >
           {isEditing ? "Disable Editing" : "Enable Editing"}
-        </button>
+        </button> */}
         <button
           onClick={() => setShowGeofences(!showGeofences)}
           style={{
@@ -248,7 +248,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
             fontSize: "14px",
           }}
         >
-          {isSelecting ? "Disable Selection" : "Enable Selection"}
+          {isSelecting ? "Disable Alert Selection" : "Enable  Alert Selection"}
         </button>
       </div>
     </div>
