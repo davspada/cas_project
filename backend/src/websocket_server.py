@@ -133,22 +133,14 @@ class WebSocketServer:
             users: List[asyncpg.Record] = await self.db.get_connected_users()
             alerts: List[asyncpg.Record] = await self.db.get_active_alerts()
 
-            def serialize_data(item: Any) -> str:
-                """
-                Helper function to serialize datetime objects for JSON encoding.
-                """
-                if isinstance(item, datetime):
-                    return item.isoformat()
-                return item
-
             # Prepare initial state response
             response: Dict[str, Any] = {
                 "users": [
-                    {key: serialize_data(value) for key, value in dict(row).items()} 
+                    {key: self.alerts.serialize_data(value) for key, value in dict(row).items()} 
                     for row in users
                 ],
                 "alerts": [
-                    {key: serialize_data(value) for key, value in dict(row).items()} 
+                    {key: self.alerts.serialize_data(value) for key, value in dict(row).items()} 
                     for row in alerts
                 ],
             }
@@ -189,6 +181,9 @@ class WebSocketServer:
             await self.db.connect()
             await self.kafka.start()
             await self.alerts.start()
+
+            # Start listening for incoming messages
+            asyncio.create_task(self.kafka.listen(self.alerts))
 
             self.logger.info("Starting mobile and frontend WebSocket servers...")
 
