@@ -1,11 +1,14 @@
 import json
+
 from datetime import datetime
 from logging import Logger
+from shapely import wkt
+from shapely.geometry import Point, Polygon
+from shapely.ops import transform
+from shapely.wkt import loads
 from typing import Any, Dict, List, Tuple, Optional
 from pyproj import Transformer
-from shapely.ops import transform
-from shapely.geometry import Point, Polygon
-from shapely import wkt
+
 from websockets import WebSocketServer
 from database_manager import DatabaseManager
 from kafka_manager import KafkaManager
@@ -59,6 +62,14 @@ class AlertManager:
             "in_2km": "ATTENTION! You are within 2km of a"
         }
 
+    def serialize_data(self, item: Any) -> str:
+        """
+        Helper function to serialize datetime objects for JSON encoding.
+        """
+        if isinstance(item, datetime):
+            return item.isoformat()
+        return item
+
     async def sync_alert_cache(self, alert: Dict[str, Any]) -> None:
         """
         Synchronize alert cache with new or updated alert information.
@@ -68,7 +79,14 @@ class AlertManager:
         
         Args:
         - alert (Dict[str, Any]): Alert data containing either time_end or geofence information
+        
+        Raises:
+        - Exception: If the alert format is invalid or the datetime
         """
+        if not isinstance(alert, dict):
+            self.logger.exception("Invalid alert format, expected a dictionary.")
+            raise Exception("Invalid alert format, expected a dictionary.")
+    
         # Handle alert termination
         if 'time_end' in alert:
             # Update database and broadcast the update message
@@ -109,21 +127,32 @@ class AlertManager:
                 self.logger.error(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
                 return
 
-            # Cache the new alert
-            self.alert_cache.append({
-                "geofence": polygon,
-                "time_start": alert['time_start'],
-                "description": alert['description']
-            })
+            alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
+            if alert_polygon not in [present['geofence'] for present in self.alert_cache]:
+                # Cache the new alert
+                self.alert_cache.append({
+                    "geofence": polygon,
+                    "time_start": alert['time_start'],
+                    "description": alert['description']
+                })
 
-            # Create the alert in the database and broadcast the update message
-            await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                if not created_alert:
+                    self.logger.error("Failed to create or retrieve alert from the database.")
+                    return
 
-            # Notify affected users
-            await self.kafka.send_message('alert-updates', alert)
-            for user_code, zone in await self.db.check_users_in_danger(alert):
-                await self.notify_users(user_code, zone, alert['description'])
-                self.user_in_danger[(user_code, alert['geofence'])] = zone
+                await self.kafka.send_message(
+                    'alert-updates', 
+                    {key: self.serialize_data(value) for key, value in created_alert.items()}
+                )
+
+                # Notify affected users
+                await self.kafka.send_message('alert-updates', alert)
+                for user_code, zone in await self.db.check_users_in_danger(alert):
+                    await self.notify_users(user_code, zone, alert['description'])
+                    self.user_in_danger[(user_code, alert['geofence'])] = zone
+
+                self.logger.info(f"Alert cache updated and synchronized for {alert['description']}")
 
     async def process_user_update(self, code: str, position: Dict[str, float]) -> None:
         """

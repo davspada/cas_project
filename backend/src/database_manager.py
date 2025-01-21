@@ -179,23 +179,31 @@ class DatabaseManager:
                 time_end, geofence
             )
 
-    async def create_alert(self, geofence: str, time_start: datetime, description: str) -> None:
+    async def create_alert(self, geofence: str, time_start: datetime, description: str) -> Optional[Dict[str, Any]]:
         """
-        Create a new alert. If the geofence already exists, skip insertion.
+        Create a new alert or return an existing one if it already exists.
         
         Args:
         - geofence (str): WKT representation of the alert's geometry
         - time_start (datetime): When the alert starts
         - description (str): Description of the alert
+        
+        Returns:
+        - Dict[str, Any]: Details of the created or existing alert
+        - None: If no action was performed (e.g., invalid geofence)
         """
         async with self.pool.acquire() as conn:
             # Check if the geofence already exists
             existing_alert = await conn.fetchrow(
-                "SELECT id FROM ALERTS WHERE geofence = ST_GeomFromText($1, 4326) AND time_end IS NULL",
+                """
+                SELECT id, ST_AsGeoJSON("geofence"), time_start, description
+                FROM ALERTS 
+                WHERE geofence = ST_GeomFromText($1, 4326) AND time_end IS NULL
+                """,
                 geofence
             )
             if existing_alert:
-                return # Skip insertion if alert already exists
+                return dict(existing_alert)
 
             # Insert new alert
             await conn.execute(
@@ -205,6 +213,21 @@ class DatabaseManager:
                 """,
                 geofence, time_start, description
             )
+
+            # Fetch and return the newly created alert
+            new_alert = await conn.fetchrow(
+                """
+                SELECT id, ST_AsGeoJSON("geofence"), time_start, description
+                FROM ALERTS 
+                WHERE geofence = ST_GeomFromText($1, 4326) AND time_end IS NULL
+                """, geofence
+            )
+            if new_alert:
+                return dict(new_alert)
+            
+            self.logger.error("Failed to create or fetch the new alert")
+            return None
+
 
     async def check_users_in_danger(self, data: Dict[str, Any]) -> List[Tuple[str, str]]:
         """
