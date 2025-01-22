@@ -98,12 +98,12 @@ export default function LoginScreen() {
         />
         <Button title="Login" onPress={handleLogin} />
 
-        <View style={styles.messagesContainer}>
+        {/* <View style={styles.messagesContainer}>
           <ThemedText type="subtitle">Messages from WebSocket:</ThemedText>
           {messages.map((msg, index) => (
           <Text key={index}>{JSON.stringify(msg)}</Text>
           ))}
-        </View>
+        </View> */}
       </ThemedView>
     </ParallaxScrollView>
   );
