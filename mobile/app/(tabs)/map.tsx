@@ -4,6 +4,7 @@ import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useWebSocket } from '@/contexts/webSocketContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useActivity } from '@/contexts/ActivityContext';
 
 interface location_type {
     code: string;
@@ -18,7 +19,7 @@ const MapScreen = () => {
     const [location, setLocation] = useState<location_type | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activity, setActivity] = useState<string>('walking');
+    const { activity, setActivity } = useActivity()
     //const [speed, setSpeed] = useState<number | null>(0);
     const { messages, sendMessage } = useWebSocket() as { messages: any; sendMessage: (message: any) => void };
     
@@ -97,12 +98,12 @@ const MapScreen = () => {
 
     const determineActivity = (speed: number | null): string => {
         let activity;
-        if (speed === null || speed < 0.5) {
+        if (speed === null || speed < 5) {
             activity = 'walking'//'still';
-        } else if (speed < 2) {
-            activity = 'walking';
-        } else if (speed < 5) {
-            activity = 'walking';
+        // } else if (speed < 2) {
+        //     activity = 'walking';
+        // } else if (speed < 5) {
+        //     activity = 'walking';
         } else {
             activity = 'car';
         }
