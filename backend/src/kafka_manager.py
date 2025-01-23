@@ -1,9 +1,10 @@
 import json
+import websockets
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from logging import Logger
-from logging_utils import AdvancedLogger
 
+from logging_utils import AdvancedLogger
 from connection_manager import ConnectionManager
 
 class KafkaManager:
@@ -94,38 +95,42 @@ class KafkaManager:
         async for message in self.consumer:
             self.logger.info(f"Received message from topic {message.topic}")
             
-            # Route messages based on topic
-            match message.topic:
-                case 'alert-updates':
-                    # Broadcast alert updates to all frontend and mobile connections
-                    for frontend in self.connections.get_frontend_connections():
-                        await self.connections.send_message(frontend, message.value)
-                    
-                    await self.alerts.sync_alert_cache(json.loads(message.value))
+            try:
+                # Route messages based on topic
+                match message.topic:
+                    case 'alert-updates':
+                        # Broadcast alert updates to all frontend and mobile connections
+                        for frontend in self.connections.get_frontend_connections():
+                            await self.connections.send_message(frontend, message.value)
+                        
+                        await self.alerts.sync_alert_cache(json.loads(message.value))
 
-                    # TODO: Reactivate mobile alerts if needed
-                    # for mobile in self.connections.get_mobile_connections():
-                    #     await self.connections.send_message(mobile, message.value)
+                        # TODO: Reactivate mobile alerts if needed
+                        # for mobile in self.connections.get_mobile_connections():
+                        #     await self.connections.send_message(mobile, message.value)
 
-                case 'users-in-danger':
-                    # Send danger notifications to specific mobile user based on user code
-                    parts: list[str] = message.value.split(", message: ")
+                    case 'users-in-danger':
+                        # Send danger notifications to specific mobile user based on user code
+                        parts: list[str] = message.value.split(", message: ")
 
-                    # Find the mobile connection based on user code
-                    for mobile in self.connections.get_mobile_code():
-                        if mobile == parts[0].split("code: ")[1].strip():
-                            await self.connections.send_message(
-                                self.connections.get_mobile_connection(mobile), 
-                                parts[1].strip()
-                            )
-                            break
-                case 'user-updates':
-                    # Broadcast user updates to all frontend connections
-                    for frontend in self.connections.get_frontend_connections():
-                        await self.connections.send_message(frontend, message.value)
-                case _:
-                    # Log messages from unknown topics
-                    self.logger.warning(f"Received message from unknown topic: {message.topic}")
+                        # Find the mobile connection based on user code
+                        for mobile in self.connections.get_mobile_code():
+                            if mobile == parts[0].split("code: ")[1].strip():
+                                await self.connections.send_message(
+                                    self.connections.get_mobile_connection(mobile), 
+                                    parts[1].strip()
+                                )
+                                break
+                    case 'user-updates':
+                        # Broadcast user updates to all frontend connections
+                        for frontend in self.connections.get_frontend_connections():
+                            await self.connections.send_message(frontend, message.value)
+                    case _:
+                        # Log messages from unknown topics
+                        self.logger.warning(f"Received message from unknown topic: {message.topic}")
+
+            except websockets.exceptions.ConnectionClosedError:
+                self.logger.info("Frontend connection closed")
 
     async def stop(self) -> None:
         """
