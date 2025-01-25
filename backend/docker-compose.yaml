@@ -77,6 +77,13 @@ services:
     ports:
       - "8080:8080"
       - "8081:8081"
+  frontend:
+    image: prod-cas-frontend1
+    build:
+      context: ../frontend/
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
 
 volumes:
   postgis_data:
