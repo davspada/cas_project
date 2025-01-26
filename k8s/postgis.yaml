@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgis
+  template:
+    metadata:
+      labels:
+        app: postgis
+    spec:
+      containers:
+      - name: postgis
+        image: postgis/postgis
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgis"
+        - name: POSTGRES_PASSWORD
+          value: "password"
+        - name: POSTGRES_DB
+          value: "mydb"
+        volumeMounts:
+        - name: postgis-data
+          mountPath: /var/lib/postgresql/data
+        - name: init-sql-volume
+          mountPath: /docker-entrypoint-initdb.d/init.sql
+          subPath: init.sql
+      volumes:
+      - name: postgis-data
+        persistentVolumeClaim:
+          claimName: postgis-data-pvc
+      - name: init-sql-volume
+        configMap:
+          name: postgis-init-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgis-init-config
+data:
+  init.sql: |
+    --Enable PostGIS extension
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS postgis_topology;
+
+    -- Create USERS table
+    CREATE TABLE USERS (
+        id SERIAL PRIMARY KEY,
+        code varchar(50) UNIQUE NOT NULL,
+        "token" varchar(50) UNIQUE NOT NULL,
+        connected boolean NOT NULL,
+        position public.geometry,
+        transport_method varchar(50)
+    );
+
+    -- Create ALERTS table
+    CREATE TABLE ALERTS (
+        id SERIAL PRIMARY KEY,
+        geofence public.geometry UNIQUE NOT NULL,
+        time_start timestamp NOT NULL,
+        time_end timestamp,
+        description text NOT NULL
+    );
+
+    -- Create index for geospatial queries
+    CREATE INDEX idx_users_position ON users USING GIST(position);
+    CREATE INDEX idx_alerts_geofence ON alerts USING GIST(geofence);
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgis-data-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgis
+spec:
+  selector:
+    app: postgis
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
