@@ -12,6 +12,7 @@ spec:
       labels:
         app: kafka
     spec:
+      enableServiceLinks: false
       containers:
       - name: kafka
         image: confluentinc/cp-kafka:latest
@@ -59,10 +60,11 @@ spec:
   selector:
     app: kafka
   ports:
-  - name: plaintext
+  - name: '9092'
     port: 9092
     targetPort: 9092
+    protocol: TCP
   - name: controller
     port: 9093
     targetPort: 9093
-
+    protocol: TCP
