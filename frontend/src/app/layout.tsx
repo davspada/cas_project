@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <WebSocketProvider url="ws://localhost:8081">
+    <WebSocketProvider url={process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8081"}>
     <html lang="en">
       <body className={inter.className}>{children}</body>
     </html>

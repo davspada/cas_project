@@ -38,6 +38,12 @@ metadata:
 spec:
   ports:
   - protocol: TCP
+    name: wsmobile
     port: 8080
+    targetPort: 8080
+  - protocol: TCP
+    name: wsfrontend
+    port: 8081
+    targetPort: 8081
   selector:
     app: backend

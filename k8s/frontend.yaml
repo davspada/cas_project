@@ -18,6 +18,9 @@ spec:
         image: prod-cas-frontend1:latest
         ports:
         - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_WEBSOCKET_URL
+          value: "ws://backend-service:8081"
 ---
 apiVersion: v1
 kind: Service

@@ -67,6 +67,9 @@ data:
         description text NOT NULL
     );
 
+    INSERT INTO USERS (code, token, connected, position, transport_method) VALUES
+    ('user003', 'token9101', true, ST_GeomFromText('POINT(11.346 44.497)', 4326), 'walking')
+    
     -- Create index for geospatial queries
     CREATE INDEX idx_users_position ON users USING GIST(position);
     CREATE INDEX idx_alerts_geofence ON alerts USING GIST(geofence);
