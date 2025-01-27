@@ -28,14 +28,16 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
     ws.onopen = () => {
       setIsConnected(true);
       console.log("WebSocket connected");
+      //sendMessage(JSON.stringify({ type: "init", payload: "Dashboard connected" }));
     };
 
     ws.onmessage = (event) => {
       try {
         // console.log("raw data: "+event.data)
         const data = JSON.parse(event.data);
-        //console.log("data: "+data)
+        console.log("data: "+JSON.parse(event.data))
         setLatestMessage(data);
+        console.log(data)
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }

@@ -36,14 +36,17 @@ kind: Service
 metadata:
   name: backend
 spec:
+  type: NodePort
   ports:
   - protocol: TCP
     name: wsmobile
     port: 8080
     targetPort: 8080
+    nodePort: 30080 # Expose port 8080 externally
   - protocol: TCP
     name: wsfrontend
     port: 8081
     targetPort: 8081
+    nodePort: 30081 # Expose port 8081 externally
   selector:
     app: backend
