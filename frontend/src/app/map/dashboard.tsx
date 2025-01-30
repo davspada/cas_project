@@ -119,7 +119,7 @@ const Dashboard = () => {
   return (
     <div style={{ position: "relative", height: "100vh" }}>
       {/* Map Container */}
-      {userPositions.length > 0 ? (
+      {userPositions.length >= 0 ? (
         <MapContainer
           userPositions={userPositions}
           mapalerts={alerts}

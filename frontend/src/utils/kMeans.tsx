@@ -12,15 +12,19 @@ export function kMeansClustering(
   features: UserPosition[],
   k: number
 ): { centroid: [number, number]; features: UserPosition[] }[] {
+  if (features.length === 0) {
+    return []; // Se non ci sono feature, restituiamo un array vuoto
+  }
+
   const maxIterations = 100;
 
   let centroids: [number, number][] = Array.from({ length: k }, () => {
     const randomFeature = features[Math.floor(Math.random() * features.length)];
-    return randomFeature.geometry.coordinates;
+    return randomFeature ? randomFeature.geometry.coordinates : [0, 0]; // Evita undefined
   });
 
-  let clusters = Array.from({ length: k }, (_, index) => ({
-    centroid: centroids[index],
+  let clusters = centroids.map(centroid => ({
+    centroid,
     features: [] as UserPosition[],
   }));
 

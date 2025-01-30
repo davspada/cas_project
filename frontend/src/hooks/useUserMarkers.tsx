@@ -1,4 +1,3 @@
-// hooks/useUserMarkers.ts
 import { useMemo } from 'react';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
@@ -22,7 +21,7 @@ interface UseUserMarkersParams {
 }
 
 const useUserMarkers = ({ userPositions, mobilityFilter }: UseUserMarkersParams) => {
-  // Define a function to create the style for the user points
+  // Funzione per ottenere lo stile dell'utente
   const getUserStyle = (mobility: string, id: string) => {
     const iconSrc = mobility === 'walking' ? '/icons/walking-solid.png' : '/icons/car-solid.png';
 
@@ -41,29 +40,28 @@ const useUserMarkers = ({ userPositions, mobilityFilter }: UseUserMarkersParams)
     });
   };
 
-  // Memoize the vector source to avoid unnecessary recalculations
+  // Memoization della vector source
   const vectorSource = useMemo(() => {
+    if (!userPositions || userPositions.length === 0) {
+      return new VectorSource(); // Evita errori se non ci sono posizioni
+    }
+
     const features = userPositions
       .filter((pos) => mobilityFilter === 'all' || pos.properties.transportation_mode === mobilityFilter)
       .map((feature) => {
         const [lon, lat] = feature.geometry.coordinates;
 
-        // Create a new feature with point geometry
         const pointFeature = new Feature({
           geometry: new Point(fromLonLat([lon, lat])),
           id: feature.properties.id,
         });
 
-        // Set the style for the feature based on mobility type
         pointFeature.setStyle(getUserStyle(feature.properties.transportation_mode, feature.properties.id));
 
         return pointFeature;
       });
 
-    // Return the new vector source
-    return new VectorSource({
-      features,
-    });
+    return new VectorSource({ features });
   }, [userPositions, mobilityFilter]);
 
   return vectorSource;
