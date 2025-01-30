@@ -21,8 +21,8 @@ const Dashboard = () => {
     if (latestMessage) {
 
       switch (true) {
-        case Array.isArray(latestMessage.users) && latestMessage.users.length > 0 &&
-             Array.isArray(latestMessage.alerts) && latestMessage.alerts.length > 0:
+        case Array.isArray(latestMessage.users) && latestMessage.users.length >= 0 &&
+             Array.isArray(latestMessage.alerts) && latestMessage.alerts.length >= 0:
           //console.log("Handling users and alerts message...");
           // Transform the user data
           const transformedUserPositions = latestMessage.users.map((user: any) => ({
@@ -45,11 +45,12 @@ const Dashboard = () => {
               description: alert.description,
             },
           }));
+          //console.log("transformed alerts: "+transformedAlerts)
           setAlerts(transformedAlerts);
           break;
 
           //no array, string incoming
-          case typeof latestMessage == "string":
+        case typeof latestMessage == "string":
           let jsonMessage = JSON.parse(latestMessage)
           switch (true){
             //single user position update

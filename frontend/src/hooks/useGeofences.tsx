@@ -34,6 +34,8 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
     useEffect(() => {
         if (!mapInstance) return;
 
+        // console.log((alerts || []).length, 'alerts received by geofence hook');
+
         const source = new VectorSource();
         const layer = new VectorLayer({
             source,

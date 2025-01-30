@@ -14,6 +14,7 @@ import { Alert, UserPosition } from '@/types';
 import VectorSource from 'ol/source/Vector';
 import useUserMarkers from '@/hooks/useUserMarkers';
 import useGeofences from '@/hooks/useGeofences';
+import { log } from 'console';
 
 interface MapContainerProps {
   userPositions: UserPosition[];
@@ -37,7 +38,8 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
     mapInstance: mapInstanceRef.current,
     alerts: mapalerts, // Pass alerts data here if needed
   });
-
+  // console.log(mapalerts.length  + " alerts received by map container")
+  // console.log(mapalerts)
   // Filter user positions based on mobility filter
   const filteredPositions = userPositions.filter(
     (position) => mobilityFilter === 'all' || position.properties.transportation_mode === mobilityFilter
@@ -134,7 +136,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
   }, [drawingType, addInteraction]);
 
   useEffect(() => {
-    if (geofenceLayer && userPositions.length > 0) {
+    if (geofenceLayer) { //&& userPositions.length >= 0
       updateGeofenceStyles(userPositions);
     }
   }, [geofenceLayer, userPositions]);
