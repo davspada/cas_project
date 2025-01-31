@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
-import { Image, StyleSheet, View, Text } from 'react-native';
+import { Image, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useWebSocket } from '@/contexts/webSocketContext';
-
 import * as Notifications from 'expo-notifications';
 import * as Speech from 'expo-speech';
 import { useActivity } from '@/contexts/ActivityContext';
+import * as Clipboard from 'expo-clipboard';
 
 export default function NotificationScreen() {
   const { messages } = useWebSocket() as { messages: any[] };
@@ -45,6 +45,11 @@ export default function NotificationScreen() {
     }
   }, [messages, activity]);
 
+  const copyToClipboard = (text: string) => {
+    Clipboard.setStringAsync(text);
+    Alert.alert('Copied to Clipboard', text);
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -60,7 +65,9 @@ export default function NotificationScreen() {
         <View style={styles.messagesContainer}>
           <ThemedText type="subtitle">Messages from WebSocket:</ThemedText>
           {messages.map((msg, index) => (
-            <Text key={index}>{JSON.stringify(msg)}</Text>
+            <TouchableOpacity key={index} onPress={() => copyToClipboard(JSON.stringify(msg))}>
+              <Text>{JSON.stringify(msg)}</Text>
+            </TouchableOpacity>
           ))}
         </View>
       </ThemedView>
