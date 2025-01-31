@@ -60,9 +60,9 @@ const useUserMarkers = ({ userPositions, mobilityFilter }: UseUserMarkersParams)
 
         return pointFeature;
       });
-
     return new VectorSource({ features });
-  }, [userPositions, mobilityFilter]);
+    
+  }, [userPositions, mobilityFilter, userPositions.map(pos => pos.properties.transportation_mode)]);
 
   return vectorSource;
 };
