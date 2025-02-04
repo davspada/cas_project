@@ -4,7 +4,6 @@ import json
 import secrets
 import websockets
 
-from datetime import datetime
 from logging import Logger
 from typing import Any, Optional, List, Dict
 
@@ -152,7 +151,7 @@ class WebSocketServer:
 
             # Main message processing loop
             async for message in websocket:
-                await self.alerts.sync_alert_cache(json.loads(message))
+                await self.kafka.send_message('alert-updates', await self.alerts.sync_alert_cache(json.loads(message)))
 
         except Exception as e:
             self.logger.exception("Error handling frontend connection")
