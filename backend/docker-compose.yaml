@@ -48,16 +48,16 @@ services:
       start_period: 20s
     entrypoint: ["/bin/bash", "-c", "/etc/confluent/docker/run & /usr/bin/create-topics.sh && wait"]
   
-  kafdrop:
-    image: obsidiandynamics/kafdrop:latest
-    depends_on:
-      - kafka
-    ports:
-      - "9000:9000"
-    environment:
-      KAFKA_BROKERCONNECT: kafka:9092
-      JVM_OPTS: "-Xms32M -Xmx64M"
-    command: ["--server.port=9000"]
+  # kafdrop:
+  #   image: obsidiandynamics/kafdrop:latest
+  #   depends_on:
+  #     - kafka
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     KAFKA_BROKERCONNECT: kafka:9092
+  #     JVM_OPTS: "-Xms32M -Xmx64M"
+  #   command: ["--server.port=9000"]
 
   backend:
     build:
@@ -77,13 +77,13 @@ services:
     ports:
       - "8080:8080"
       - "8081:8081"
-  frontend:
-    image: prod-cas-frontend1
-    build:
-      context: ../frontend/
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+  # frontend:
+  #   image: prod-cas-frontend1
+  #   build:
+  #     context: ../frontend/
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
 
 volumes:
   postgis_data:

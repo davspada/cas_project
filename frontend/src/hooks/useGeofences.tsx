@@ -72,8 +72,8 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
             setGeofenceData(features);
         }
 
-        enableHoverPreview();
-        enableClickSelection();
+        //enableHoverPreview();
+        //enableClickSelection();
 
         return () => {
             mapInstance.removeLayer(layer);
@@ -104,9 +104,9 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
         });
     }, [mapInstance, geofenceLayer]);
 
-    const enableClickSelection = useCallback(() => {
+    function enableClickSelection() {
         if (!mapInstance || !geofenceLayer) return;
-    
+
         const clickSelect = new Select({
             condition: click,
             layers: [geofenceLayer],
@@ -115,8 +115,9 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
             }),
             multi: false,
         });
+        setClickSelectInteraction(clickSelect);
         mapInstance.addInteraction(clickSelect);
-    
+
         let lastClickedPixel: Pixel | null = null;
         let currentFeatureIndex = 0;
     
@@ -139,9 +140,9 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                     selectedFeaturesSource.clear(); // Clear previous selections
                     if (feature) {
                         selectedFeaturesSource.addFeature(feature);
-                        console.log('Selected feature:', feature);
+                        // console.log('Selected feature:', feature);
                         const properties = feature.getProperties().properties;
-                        console.log('Feature properties:', properties);
+                        // console.log('Feature properties:', properties);
             
                         // Example: Show properties in a popup using Swal
                         Swal.fire({
@@ -150,6 +151,35 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                                     <p><strong>Description:</strong> ${properties.description}</p>
                                    <p><strong>Time Start:</strong> ${properties.time_start}</p>`,
                             icon: 'info',
+                            showCancelButton: true,
+                            cancelButtonText: 'Delete Alert',
+                            cancelButtonColor: '#d33',
+                        }).then((result) => {
+                            if (result.dismiss === Swal.DismissReason.cancel) {
+                                const transformedGeometry = feature
+                                    .getGeometry()
+                                    ?.clone()
+                                    .transform('EPSG:3857', 'EPSG:4326');
+
+                                const wktFormat = new WKT();
+                                const wktString = wktFormat.writeGeometry(transformedGeometry);
+
+                                const alertToDelete = {
+                                    geofence: wktString, // Directly use the GeoJSON object (no stringification here)
+                                    time_end: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
+                                    //description: result.value, // Use the inserted description
+                                    id: properties.id
+                                };
+                                console.log("deleting"+ JSON.stringify(alertToDelete));
+                                sendMessage(JSON.stringify(alertToDelete));
+                                selectedFeaturesSource.removeFeature(feature);
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Alert deleted',
+                                    showConfirmButton: false,
+                                    timer: 1500,
+                                });
+                            }
                         });
 
                     }   
@@ -161,7 +191,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                 console.log("No feature selected, clearing selection");
             }
         });
-    }, [mapInstance, geofenceLayer]);    
+    }
 
     const addInteraction = useCallback(
         (type: 'Polygon' | 'Circle' | null) => {
@@ -225,7 +255,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                                 time_start: new Date().toISOString().replace('Z', ''), // Ensure no 'Z' suffix
                                 description: result.value, // Use the inserted description
                             };
-                        
+                            // console.log(JSON.stringify(newAlert));
                             // Send the message via WebSocket (send the newAlert as a stringified object)
                             sendMessage(JSON.stringify(newAlert));
                             Swal.fire({
@@ -288,14 +318,29 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
         }
     }, [enableEditing, modifyInteraction, snapInteraction, mapInstance]);
 
-    const disableSelectInteraction = useCallback(() => {
-        if (mapInstance && clickSelectInteraction && hoverSelectInteraction) {
+    function disableSelectInteraction() {
+        if (!mapInstance) return;
+    
+        // Clear the clickSelectInteraction if it's present
+        if (clickSelectInteraction) {
+            console.log("Removing select interaction");
+            clickSelectInteraction.setActive(false);
+            clickSelectInteraction.un(click, "click")
             mapInstance.removeInteraction(clickSelectInteraction);
-            setClickSelectInteraction(null);
-            mapInstance.removeInteraction(hoverSelectInteraction);
-            setHoverSelectInteraction(null);
+            setClickSelectInteraction(null); // Clear the state reference
         }
-    }, [mapInstance, clickSelectInteraction, hoverSelectInteraction]);
+        console.log(clickSelectInteraction?.getActive())
+        // Optionally, check for any remaining Select interactions
+        mapInstance.getInteractions().forEach((interaction) => {
+            if (interaction instanceof Select) {
+                console.log("Removing a lingering select interaction");
+                mapInstance.removeInteraction(interaction);
+            }
+        });
+    
+        // Ensure the map is properly re-rendered after interaction removal
+        mapInstance.render();
+    }    
 
     const updateGeofenceStyles = (userPositions: UserPosition[]) => {
         if (!geofenceLayer) return;
@@ -339,5 +384,6 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
         enableClickSelection,
         disableSelectInteraction,
         updateGeofenceStyles,
+        clickSelectInteraction
     };
 }

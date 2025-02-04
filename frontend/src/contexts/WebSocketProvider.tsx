@@ -35,7 +35,7 @@ export const WebSocketProvider: React.FC<{ url: string; children: ReactNode }> =
       try {
         // console.log("raw data: "+event.data)
         const data = JSON.parse(event.data);
-        //console.log("data: "+JSON.parse(event.data))
+        console.log("data: "+JSON.parse(event.data))
         setLatestMessage(data);
         console.log(data)
       } catch (error) {

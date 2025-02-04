@@ -86,15 +86,24 @@ class AlertManager:
         if not isinstance(alert, dict):
             self.logger.exception("Invalid alert format, expected a dictionary.")
             raise Exception("Invalid alert format, expected a dictionary.")
-    
+        
+        self.logger.info(f"Received alert: {alert}")
+        
         # Handle alert termination
         if 'time_end' in alert:
-
+            try:
+                # Parse and normalize the datetime
+                formatted_end_time: datetime = datetime.fromisoformat(
+                    alert['time_end'].replace("Z", "+00:00")
+                ).replace(tzinfo=None)
+            except ValueError:
+                self.logger.exception(f"Invalid datetime format in time_end: {alert['time_end']}")
+                raise Exception("Invalid alert format, expected a dictionary.")
             alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
             if alert_polygon in [present['geofence'] for present in self.alert_cache]:
             
                 # Update database and broadcast the update message
-                await self.db.update_alert(alert['time_end'], alert['geofence'])
+                await self.db.update_alert(formatted_end_time, alert['geofence'])
                 
                 # Remove alert from cache and notify affected users
                 self.alert_cache = [a for a in self.alert_cache if a['geofence'] != alert['geofence']]
