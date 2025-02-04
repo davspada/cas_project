@@ -59,7 +59,7 @@ services:
       JVM_OPTS: "-Xms32M -Xmx64M"
     command: ["--server.port=9000"]
 
-  test-main:
+  backend:
     build:
       context: .
       dockerfile: dockerfile

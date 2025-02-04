@@ -89,16 +89,27 @@ class AlertManager:
     
         # Handle alert termination
         if 'time_end' in alert:
-            # Update database and broadcast the update message
-            await self.db.update_alert(alert['time_end'], alert['geofence'])
-            await self.kafka.send_message('alert-updates', alert)
 
-            # Remove alert from cache and notify affected users
-            self.alert_cache = [a for a in self.alert_cache if a['geofence'] != alert['geofence']]
-            for (code, geofence), zone in list(self.user_in_danger.items()):
-                if geofence == alert['geofence']:
-                    await self.notify_users(code, None, f"Alert {alert['geofence']} has ended.")
-                    self.user_in_danger.pop((code, geofence))
+            alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
+            if alert_polygon in [present['geofence'] for present in self.alert_cache]:
+            
+                # Update database and broadcast the update message
+                await self.db.update_alert(alert['time_end'], alert['geofence'])
+                
+                # Remove alert from cache and notify affected users
+                self.alert_cache = [a for a in self.alert_cache if a['geofence'] != alert['geofence']]
+                for (code, geofence), zone in list(self.user_in_danger.items()):
+                    if geofence == alert['geofence']:
+                        await self.notify_users(code, None, f"Alert {alert['geofence']} has ended.")
+                        self.user_in_danger.pop((code, geofence))
+                
+                # Create or retrieve the alert in the database and return the serialized data
+                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                if not created_alert:
+                    self.logger.exception("Failed to create or retrieve alert from the database.")
+                    raise Exception("Failed to create or retrieve alert from the database.")
+
+                return {key: self.serialize_data(value) for key, value in created_alert.items()}
 
         # Handle new alert creation
         elif 'geofence' in alert:
@@ -108,8 +119,8 @@ class AlertManager:
                     alert['time_start'].replace("Z", "+00:00")
                 ).replace(tzinfo=None)
             except ValueError:
-                self.logger.error(f"Invalid datetime format in time_start: {alert['time_start']}")
-                return
+                self.logger.exception(f"Invalid datetime format in time_start: {alert['time_start']}")
+                raise Exception("Invalid alert format, expected a dictionary.")
 
             try:
                 # Parse geofence data, handling both WKT and raw coordinate formats
@@ -124,8 +135,8 @@ class AlertManager:
                     polygon = Polygon(coordinates)
                     alert['geofence'] = polygon.wkt
             except Exception as e:
-                self.logger.error(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
-                return
+                self.logger.exception(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
+                raise Exception("Invalid alert format, expected a dictionary.")
 
             alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
             if alert_polygon not in [present['geofence'] for present in self.alert_cache]:
@@ -136,23 +147,20 @@ class AlertManager:
                     "description": alert['description']
                 })
 
-                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
-                if not created_alert:
-                    self.logger.error("Failed to create or retrieve alert from the database.")
-                    return
-
-                await self.kafka.send_message(
-                    'alert-updates', 
-                    {key: self.serialize_data(value) for key, value in created_alert.items()}
-                )
-
                 # Notify affected users
-                await self.kafka.send_message('alert-updates', alert)
                 for user_code, zone in await self.db.check_users_in_danger(alert):
                     await self.notify_users(user_code, zone, alert['description'])
                     self.user_in_danger[(user_code, alert['geofence'])] = zone
 
                 self.logger.info(f"Alert cache updated and synchronized for {alert['description']}")
+
+                # Create or retrieve the alert in the database and return the serialized data
+                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                if not created_alert:
+                    self.logger.exception("Failed to create or retrieve alert from the database.")
+                    raise Exception("Failed to create or retrieve alert from the database.")
+
+                return {key: self.serialize_data(value) for key, value in created_alert.items()}
 
     async def process_user_update(self, code: str, position: Dict[str, float]) -> None:
         """
