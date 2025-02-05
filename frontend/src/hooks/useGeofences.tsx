@@ -173,6 +173,7 @@ export default function useGeofences({ mapInstance, alerts }: UseGeofencesProps)
                                 console.log("deleting"+ JSON.stringify(alertToDelete));
                                 sendMessage(JSON.stringify(alertToDelete));
                                 selectedFeaturesSource.removeFeature(feature);
+                                geofenceLayer.getSource()?.removeFeature(feature); // Remove the feature from the geofence layer
                                 Swal.fire({
                                     icon: 'success',
                                     title: 'Alert deleted',
