@@ -83,93 +83,103 @@ class AlertManager:
         Raises:
         - Exception: If the alert format is invalid or the datetime
         """
-        if not isinstance(alert, dict):
-            self.logger.exception("Invalid alert format, expected a dictionary.")
+        self.logger.debug(f"Received alert: {alert}")
+
+        try:
+            # Determina quale campo di tempo utilizzare
+            if 'time_start' in alert:
+                time_str = alert['time_start'].replace("Z", "+00:00")
+            elif 'time_end' in alert:
+                time_str = alert['time_end'].replace("Z", "+00:00")
+
+            # Parse e normalizza la data
+            formatted_date: datetime = datetime.fromisoformat(time_str).replace(tzinfo=None)
+
+            # Handle alert termination
+            if 'time_end' in alert:
+
+                self.logger.info("TRUE")
+                
+                try:
+                    # Parse and normalize the datetime
+                    formatted_end_time: datetime = datetime.fromisoformat(
+                        alert['time_end'].replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
+                except ValueError:
+                    self.logger.exception(f"Invalid datetime format in time_end: {alert['time_end']}")
+                    raise Exception("Invalid alert format, expected a dictionary.")
+                
+                alert_polygon = loads(alert['geofence'])
+                if any(alert_polygon.equals_exact(present['geofence'], tolerance=1e-9) for present in self.alert_cache):                
+                    self.logger.info("TRUE2")
+
+                    # Update database and broadcast the update message
+                    await self.db.update_alert(formatted_end_time, alert['geofence'])
+                    
+                    # Find the alert to delete in the cache and notify affected users
+                    deleted_alert = next(
+                        (a for a in self.alert_cache if a['geofence'].equals_exact(alert_polygon, tolerance=1e-9)), 
+                        None
+                    )
+
+                    # Remove alert from cache and notify affected users
+                    self.alert_cache = [a for a in self.alert_cache if not a['geofence'].equals_exact(alert_polygon, tolerance=1e-9)]
+                    for (code, geofence), zone in list(self.user_in_danger.items()):
+                        if geofence == alert['geofence']:
+                            await self.notify_users(code, None, f"Alert {alert['geofence']} has ended.")
+                            self.user_in_danger.pop((code, geofence))
+
+                    return {
+                        "geofence": deleted_alert["geofence"].wkt,
+                        "time_end": self.serialize_data(deleted_alert["time_start"]),
+                        "description": deleted_alert["description"]
+                    }
+
+            # Handle new alert creation
+            elif 'geofence' in alert:
+
+                try:
+                    # Parse geofence data, handling both WKT and raw coordinate formats
+                    if alert['geofence'].strip().startswith(('POLYGON', 'LINESTRING', 'POINT')):
+                        polygon: Polygon = wkt.loads(alert['geofence'])
+                    else:
+                        # Parse raw coordinate pairs and create a polygon
+                        pairs: List[str] = alert['geofence'].split(", ")
+                        coordinates: List[Tuple[float, float]] = [
+                            (float(lon), float(lat)) for lon, lat in (pair.split() for pair in pairs)
+                        ]
+                        polygon = Polygon(coordinates)
+                        alert['geofence'] = polygon.wkt
+                except Exception as e:
+                    self.logger.exception(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
+                    raise Exception("Invalid alert format, expected a dictionary.")
+
+                alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
+                if not any(alert_polygon.equals_exact(present['geofence'], tolerance=1e-9) for present in self.alert_cache):
+                    # Cache the new alert
+                    self.alert_cache.append({
+                        "geofence": polygon,
+                        "time_start": alert['time_start'],
+                        "description": alert['description']
+                    })
+
+                    # Notify affected users
+                    for user_code, zone in await self.db.check_users_in_danger(alert):
+                        await self.notify_users(user_code, zone, alert['description'])
+                        self.user_in_danger[(user_code, alert['geofence'])] = zone
+
+                    self.logger.info(f"Alert cache updated and synchronized for {alert['description']}")
+
+                    # Create or retrieve the alert in the database and return the serialized data
+                    created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
+                    if not created_alert:
+                        self.logger.exception("Failed to create or retrieve alert from the database.")
+                        raise Exception("Failed to create or retrieve alert from the database.")
+
+                    return {key: self.serialize_data(value) for key, value in created_alert.items()}
+        except ValueError:
+            self.logger.exception(f"Invalid datetime format in time_start: {alert['time_start']}")
             raise Exception("Invalid alert format, expected a dictionary.")
-        
-        self.logger.info(f"Received alert: {alert}")
-        
-        # Handle alert termination
-        if 'time_end' in alert:
-            try:
-                # Parse and normalize the datetime
-                formatted_end_time: datetime = datetime.fromisoformat(
-                    alert['time_end'].replace("Z", "+00:00")
-                ).replace(tzinfo=None)
-            except ValueError:
-                self.logger.exception(f"Invalid datetime format in time_end: {alert['time_end']}")
-                raise Exception("Invalid alert format, expected a dictionary.")
-            alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
-            if alert_polygon in [present['geofence'] for present in self.alert_cache]:
-            
-                # Update database and broadcast the update message
-                await self.db.update_alert(formatted_end_time, alert['geofence'])
-                
-                # Remove alert from cache and notify affected users
-                self.alert_cache = [a for a in self.alert_cache if a['geofence'] != alert['geofence']]
-                for (code, geofence), zone in list(self.user_in_danger.items()):
-                    if geofence == alert['geofence']:
-                        await self.notify_users(code, None, f"Alert {alert['geofence']} has ended.")
-                        self.user_in_danger.pop((code, geofence))
-                
-                # Create or retrieve the alert in the database and return the serialized data
-                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
-                if not created_alert:
-                    self.logger.exception("Failed to create or retrieve alert from the database.")
-                    raise Exception("Failed to create or retrieve alert from the database.")
-
-                return {key: self.serialize_data(value) for key, value in created_alert.items()}
-
-        # Handle new alert creation
-        elif 'geofence' in alert:
-            try:
-                # Parse and normalize the datetime
-                formatted_date: datetime = datetime.fromisoformat(
-                    alert['time_start'].replace("Z", "+00:00")
-                ).replace(tzinfo=None)
-            except ValueError:
-                self.logger.exception(f"Invalid datetime format in time_start: {alert['time_start']}")
-                raise Exception("Invalid alert format, expected a dictionary.")
-
-            try:
-                # Parse geofence data, handling both WKT and raw coordinate formats
-                if alert['geofence'].strip().startswith(('POLYGON', 'LINESTRING', 'POINT')):
-                    polygon: Polygon = wkt.loads(alert['geofence'])
-                else:
-                    # Parse raw coordinate pairs and create a polygon
-                    pairs: List[str] = alert['geofence'].split(", ")
-                    coordinates: List[Tuple[float, float]] = [
-                        (float(lon), float(lat)) for lon, lat in (pair.split() for pair in pairs)
-                    ]
-                    polygon = Polygon(coordinates)
-                    alert['geofence'] = polygon.wkt
-            except Exception as e:
-                self.logger.exception(f"Failed to parse geofence: {alert['geofence']}, Error: {e}")
-                raise Exception("Invalid alert format, expected a dictionary.")
-
-            alert_polygon = loads(alert['geofence'])  # Convert WKT string to Polygon
-            if alert_polygon not in [present['geofence'] for present in self.alert_cache]:
-                # Cache the new alert
-                self.alert_cache.append({
-                    "geofence": polygon,
-                    "time_start": alert['time_start'],
-                    "description": alert['description']
-                })
-
-                # Notify affected users
-                for user_code, zone in await self.db.check_users_in_danger(alert):
-                    await self.notify_users(user_code, zone, alert['description'])
-                    self.user_in_danger[(user_code, alert['geofence'])] = zone
-
-                self.logger.info(f"Alert cache updated and synchronized for {alert['description']}")
-
-                # Create or retrieve the alert in the database and return the serialized data
-                created_alert = await self.db.create_alert(alert['geofence'], formatted_date, alert['description'])
-                if not created_alert:
-                    self.logger.exception("Failed to create or retrieve alert from the database.")
-                    raise Exception("Failed to create or retrieve alert from the database.")
-
-                return {key: self.serialize_data(value) for key, value in created_alert.items()}
 
     async def process_user_update(self, code: str, position: Dict[str, float]) -> None:
         """

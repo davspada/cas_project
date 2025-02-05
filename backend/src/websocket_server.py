@@ -151,7 +151,9 @@ class WebSocketServer:
 
             # Main message processing loop
             async for message in websocket:
-                await self.kafka.send_message('alert-updates', await self.alerts.sync_alert_cache(json.loads(message)))
+                self.logger.info(f"Received message from frontend: {message}")
+                if "geofence" in message:
+                    await self.kafka.send_message('alert-updates', await self.alerts.sync_alert_cache(json.loads(message)))
 
         except Exception as e:
             self.logger.exception("Error handling frontend connection")
