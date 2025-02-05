@@ -111,6 +111,8 @@ class WebSocketServer:
                 self.connections.remove_mobile_connection(code)
                 await self.db.update_user_connection(code, False)
                 self.logger.info(f"User {code} disconnected")
+                for frontend in self.connections.get_frontend_connections():
+                    await self.connections.send_message(frontend, {"user": code, "connected": False})
 
     async def handle_frontend(self, websocket: websockets.WebSocketServerProtocol, path: str) -> None:
         """
