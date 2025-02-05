@@ -24,3 +24,6 @@ backend/data/
 app/
 
 backend/src/__pycache__/
+
+*/android/
+*.apk
