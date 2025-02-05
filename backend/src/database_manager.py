@@ -165,18 +165,18 @@ class DatabaseManager:
                 """
             )
 
-    async def update_alert(self, time_end: datetime, geofence: str) -> None:
+    async def update_alert(self, time_end: datetime, id: int) -> None:
         """
         Update an alert's end time.
         
         Args:
         - time_end (datetime): When the alert ends
-        - geofence (str): WKT representation of the alert's geometry
+        - id (int): Alert's unique identifier
         """
         async with self.pool.acquire() as conn:
             await conn.execute(
-                "UPDATE ALERTS SET time_end = $1 WHERE geofence = $2",
-                time_end, geofence
+                "UPDATE ALERTS SET time_end = $1 WHERE id = $2",
+                time_end, id
             )
 
     async def create_alert(self, geofence: str, time_start: datetime, description: str) -> Optional[Dict[str, Any]]:

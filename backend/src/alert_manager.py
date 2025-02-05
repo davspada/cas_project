@@ -114,7 +114,7 @@ class AlertManager:
                     self.logger.info("TRUE2")
 
                     # Update database and broadcast the update message
-                    await self.db.update_alert(formatted_end_time, alert['geofence'])
+                    await self.db.update_alert(formatted_end_time, alert['id'])
                     
                     # Find the alert to delete in the cache and notify affected users
                     deleted_alert = next(
