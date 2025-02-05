@@ -20,6 +20,12 @@ const Dashboard = () => {
   useEffect(() => {
     if (latestMessage) {
       switch (true) {
+        case latestMessage.user && latestMessage.connected === false:
+          console.log("User disconnected:", latestMessage.user);
+          setUserPositions((prevUserPositions) =>
+            prevUserPositions.filter((user) => user.properties.id !== latestMessage.user)
+          );
+          break;
         case Array.isArray(latestMessage.users) && latestMessage.users.length >= 0 &&
              Array.isArray(latestMessage.alerts) && latestMessage.alerts.length >= 0:
           // Transform the user data
@@ -101,7 +107,6 @@ const Dashboard = () => {
               };
               setAlerts((prevAlerts) => [...prevAlerts, new_alert]);
               break;
-  
             default:
               console.log("Unhandled message type:", latestMessage);
           }

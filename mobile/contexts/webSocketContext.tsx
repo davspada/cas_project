@@ -8,7 +8,7 @@ export const WebSocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Initialize the WebSocket connection
-    socket.current = new WebSocket('ws://cas-sandiego.lab.students.cs.unibo.it:30080');//'ws://10.0.2.2:8080');
+    socket.current = new WebSocket('ws://192.168.1.22:8080')//('ws://10.0.2.2:8080');//ws://cas-sandiego.lab.students.cs.unibo.it:30080
 
     socket.current.onopen = () => {
       console.log('WebSocket connection opened');
