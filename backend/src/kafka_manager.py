@@ -102,12 +102,11 @@ class KafkaManager:
                         # Broadcast alert updates to all frontend and mobile connections
                         for frontend in self.connections.get_frontend_connections():
                             await self.connections.send_message(frontend, message.value)
-                        
-                        await self.alerts.sync_alert_cache(json.loads(message.value))
 
-                        # TODO: Reactivate mobile alerts if needed
-                        # for mobile in self.connections.get_mobile_connections():
-                        #     await self.connections.send_message(mobile, message.value)
+                        for mobile in self.connections.get_mobile_connections():
+                            await self.connections.send_message(mobile, message.value)
+
+                        await self.alerts.sync_alert_cache(json.loads(message.value))
 
                     case 'users-in-danger':
                         # Send danger notifications to specific mobile user based on user code
