@@ -5,4 +5,4 @@ out
 .git
 .vscode
 .idea
-.env
+#.env
