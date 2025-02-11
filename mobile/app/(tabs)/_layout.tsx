@@ -11,6 +11,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from "expo-constants"; // Optional
 import { ActivityProvider } from '@/contexts/ActivityContext';
+import { AlertProvider } from '@/contexts/alertContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -26,6 +27,7 @@ export default function TabLayout() {
   return (
     <WebSocketProvider>
     <ActivityProvider>
+    <AlertProvider>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
@@ -59,6 +61,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </AlertProvider>
     </ActivityProvider>
     </WebSocketProvider>
   );

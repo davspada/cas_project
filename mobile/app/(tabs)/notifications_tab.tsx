@@ -8,10 +8,12 @@ import * as Notifications from 'expo-notifications';
 import * as Speech from 'expo-speech';
 import { useActivity } from '@/contexts/ActivityContext';
 import * as Clipboard from 'expo-clipboard';
+import { useAlert } from '@/contexts/alertContext'; // Import the alerts context
 
 export default function NotificationScreen() {
   const { messages } = useWebSocket() as { messages: any[] };
   const { activity } = useActivity();
+  const { alerts, setAlerts } = useAlert(); // Get the setAlerts function from the alerts context
 
   useEffect(() => {
     const speakNotification = (text: string) => {
@@ -21,16 +23,30 @@ export default function NotificationScreen() {
         rate: 1.0, // Adjust rate for slower or faster speech
       });
     };
-
+  
     const handleNewMessage = async (message: any) => {
+      //console.log("Received message:", message); // Debugging
+  
+      if (typeof message === 'string') {
+        try {
+          message = JSON.parse(message);
+        } catch (error) {
+          console.error("Error parsing message:", error);
+          return;
+        }
+      }
+  
+      // if (!message || !message.alerts) {
+      //   console.warn("Message format incorrect:", message);
+      //   return;
+      // }
+  
       const notificationText = `New alert notification incoming. Message: ${JSON.stringify(message)}`;
-
+  
       if (activity === 'car') {
-        // Read the notification aloud if the activity is "car"
         speakNotification(notificationText);
       }
-
-      // Show a notification for all activities
+  
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'New Alert Notification',
@@ -38,12 +54,29 @@ export default function NotificationScreen() {
         },
         trigger: null,
       });
+  
+      //console.log('Parsed alerts:', message.alerts);
+  
+      if (Array.isArray(message.alerts) && message.alerts.length > 0) {
+        const transformedAlerts = message.alerts.map((alert: any) => ({
+          type: "Feature",
+          geometry: JSON.parse(alert.st_asgeojson), // Parse GeoJSON geometry
+          properties: {
+            id: alert.id,
+            time_start: alert.time_start,
+            description: alert.description,
+          },
+        }));
+        //console.log(transformedAlerts)
+        setAlerts(transformedAlerts);
+      }
     };
-
+  
+    // Call handleNewMessage when a new message is received
     if (messages.length > 0) {
       handleNewMessage(messages[messages.length - 1]);
     }
-  }, [messages, activity]);
+  }, [messages, activity, setAlerts]);
 
   const copyToClipboard = (text: string) => {
     Clipboard.setStringAsync(text);
