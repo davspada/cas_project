@@ -34,7 +34,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
   const [isSelecting, setIsSelecting] = useState(false);
 
   // Custom hook for managing geofence layer and interactions
-  const { geofenceLayer, addInteraction, toggleEditing, isEditing, disableSelectInteraction, enableHoverPreview, enableClickSelection, updateGeofenceStyles} = useGeofences({
+  const { geofenceLayer, addInteraction, toggleEditing, isEditing, disableSelectInteraction, clickSelectInteraction, enableClickSelection, updateGeofenceStyles} = useGeofences({
     mapInstance: mapInstanceRef.current,
     alerts: mapalerts, // Pass alerts data here if needed
   });
@@ -143,6 +143,7 @@ const MapContainer: React.FC<MapContainerProps> = ({ userPositions, mapalerts, m
 
     // Handle toggling the select interaction
   const handleToggleSelect = () => {
+    //console.log("selection state: "+isSelecting)
     if (isSelecting) {
       disableSelectInteraction();
     } else {

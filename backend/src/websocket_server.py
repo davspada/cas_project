@@ -4,7 +4,6 @@ import json
 import secrets
 import websockets
 
-from datetime import datetime
 from logging import Logger
 from typing import Any, Optional, List, Dict
 
@@ -85,6 +84,11 @@ class WebSocketServer:
                 await self.db.create_user(code, new_token)
                 await self.connections.send_message(websocket, {"token": new_token})
 
+            # Send all the active alerts to the user
+            alerts: List[asyncpg.Record] = await self.db.get_active_alerts()
+            response: List[Any] = [{key: self.alerts.serialize_data(value) for key, value in dict(alert).items()} for alert in alerts]
+            await self.connections.send_message(websocket, {"alerts": response})
+                
             # Update user's connection status and store WebSocket connection
             await self.db.update_user_connection(code, True)
             self.connections.add_mobile_connection(code, websocket)
@@ -112,6 +116,8 @@ class WebSocketServer:
                 self.connections.remove_mobile_connection(code)
                 await self.db.update_user_connection(code, False)
                 self.logger.info(f"User {code} disconnected")
+                for frontend in self.connections.get_frontend_connections():
+                    await self.connections.send_message(frontend, {"user": code, "connected": False})
 
     async def handle_frontend(self, websocket: websockets.WebSocketServerProtocol, path: str) -> None:
         """
@@ -152,7 +158,9 @@ class WebSocketServer:
 
             # Main message processing loop
             async for message in websocket:
-                await self.alerts.sync_alert_cache(json.loads(message))
+                self.logger.info(f"Received message from frontend: {message}")
+                if "geofence" in message:
+                    await self.kafka.send_message('alert-updates', await self.alerts.sync_alert_cache(json.loads(message)))
 
         except Exception as e:
             self.logger.exception("Error handling frontend connection")
