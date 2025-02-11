@@ -84,6 +84,11 @@ class WebSocketServer:
                 await self.db.create_user(code, new_token)
                 await self.connections.send_message(websocket, {"token": new_token})
 
+            # Send all the active alerts to the user
+            alerts: List[asyncpg.Record] = await self.db.get_active_alerts()
+            response: List[Any] = [{key: self.alerts.serialize_data(value) for key, value in dict(alert).items()} for alert in alerts]
+            await self.connections.send_message(websocket, {"alerts": response})
+                
             # Update user's connection status and store WebSocket connection
             await self.db.update_user_connection(code, True)
             self.connections.add_mobile_connection(code, websocket)
