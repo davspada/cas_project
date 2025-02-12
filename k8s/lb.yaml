@@ -7,7 +7,9 @@ spec:
   selector:
     app: backend
   ports:
-  - port: 8081
+  - name: front-port
+    port: 8081
     targetPort: 8081
-  - port: 8080
+  - name: back-port
+    port: 8080
     targetPort: 8080
