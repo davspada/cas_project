@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: backend
 spec:
-  replicas: 2
+  # replicas: 2
   selector:
     matchLabels:
       app: backend
@@ -30,6 +30,49 @@ spec:
           value: "postgis"
         - name: KAFKA_BROKER
           value: "kafka:9092"
+        resources:
+          requests:
+            cpu: "250m"  # Il pod chiede almeno 250 milliCPU
+            memory: "256Mi"
+          limits:
+            cpu: "500m"  # Limite massimo CPU per pod
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: backend
+  ports:
+  - name: frontend-api
+    port: 8081
+    targetPort: 8081
+  - name: mobile-api
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+
 # ---
 # apiVersion: v1
 # kind: Service

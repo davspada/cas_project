@@ -1,25 +1,35 @@
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: backend-ingress
-#   annotations:
-#     nginx.ingress.kubernetes.io/rewrite-target: /
-# spec:
-#   rules:
-#   - host: localhost
-#     http:
-#       paths:
-#       - path: /ws-mobile
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: backend
-#             port:
-#               number: 8080
-#       - path: /ws-frontend
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: backend
-#             port:
-#               number: 8081
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: frontend.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 3000
+  - host: backend.local
+    http:
+      paths:
+      - path: /ws-frontend
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-lb
+            port:
+              number: 8081
+      - path: /ws-mobile
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-lb
+            port:
+              number: 8080

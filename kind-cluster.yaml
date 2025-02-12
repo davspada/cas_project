@@ -34,6 +34,11 @@ apiVersion: kind.x-k8s.io/v1alpha4
 # You probably don't need this unless you are testing Kubernetes itself.
 nodes:
 - role: control-plane
+  extraPortMappings:
+    - containerPort: 80
+      hostPort: 80
+    - containerPort: 443
+      hostPort: 443
 - role: worker
-- role: worker
-- role: worker
+# - role: worker
+# - role: worker
