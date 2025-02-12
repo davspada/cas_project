@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: foo-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: backend
+  ports:
+  - port: 8081
+    targetPort: 8081
+  - port: 8080
+    targetPort: 8080

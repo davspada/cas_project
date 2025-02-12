@@ -18,17 +18,17 @@ spec:
         image: prod-cas-frontend1:latest
         ports:
         - containerPort: 3000
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend
-spec:
-  type: NodePort
-  ports:
-  - protocol: TCP
-    port: 3000
-    targetPort: 3000
-    nodePort: 30082 # Optional. Defaults to a random port if not set.
-  selector:
-    app: frontend
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: frontend
+# spec:
+#   type: NodePort
+#   ports:
+#   - protocol: TCP
+#     port: 3000
+#     targetPort: 3000
+#     nodePort: 30082 # Optional. Defaults to a random port if not set.
+#   selector:
+#     app: frontend
