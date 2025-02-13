@@ -257,7 +257,7 @@ class AlertManager:
         
         # Add the new row
         new_entry = pd.DataFrame([{
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "code": code,
             "transport_method_predicted": transport_method,
             "real_transport_method": None,
