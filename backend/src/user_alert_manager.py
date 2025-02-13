@@ -1,4 +1,7 @@
 import json
+import os
+
+import pandas as pd
 
 from datetime import datetime
 from logging import Logger
@@ -8,6 +11,7 @@ from shapely.ops import transform
 from shapely.wkt import loads
 from typing import Any, Dict, List, Tuple, Optional
 from pyproj import Transformer
+from sklearn.metrics import precision_score, recall_score
 
 from websockets import WebSocketServer
 from database_manager import DatabaseManager
@@ -181,7 +185,7 @@ class AlertManager:
             self.logger.exception(f"Invalid datetime format in time_start: {alert['time_start']}")
             raise Exception("Invalid alert format, expected a dictionary.")
 
-    async def process_user_update(self, code: str, position: Dict[str, float]) -> None:
+    async def user_position_update(self, code: str, position: Dict[str, float]) -> None:
         """
         Process a user's position update and check for proximity to danger zones.
         
@@ -230,6 +234,60 @@ class AlertManager:
                     if zone is not None:
                         await self.notify_users(code, None, f"Exited danger zone for {alert['description']}")
                         self.user_in_danger.pop(geofence_key, None)
+
+    async def user_transport_update(self, code: str, transport_method: str) -> None:
+        """
+        Update the CSV file with the transport method and calculate precision and recall.
+        
+        Args:
+        - code (str): User identifier.
+        - transport_method (str): Predicted transport method.
+        """
+
+        csv_file = "transport_data.csv"
+
+        # Create the DataFrame if the file does not exist
+        if not os.path.exists(csv_file):
+            df = pd.DataFrame(columns=["timestamp", "code", "transport_method_predicted", "real_transport_method", "precision", "recall"])
+        else:
+            df = pd.read_csv(csv_file)
+
+        # Remove the last precision_recall row if it exists
+        df = df[df["timestamp"] != "precision_recall"]
+        
+        # Add the new row
+        new_entry = pd.DataFrame([{
+            "timestamp": datetime.now().isoformat(),
+            "code": code,
+            "transport_method_predicted": transport_method,
+            "real_transport_method": None,
+            "precision": None,
+            "recall": None
+        }])
+        df = pd.concat([df, new_entry], ignore_index=True)
+        
+        # Filter only rows where both transport methods are known
+        df_filtered = df.dropna(subset=["real_transport_method"])
+        
+        # Calculate precision and recall if there is enough data
+        if not df_filtered.empty:
+            precision = precision_score(df_filtered["real_transport_method"], df_filtered["transport_method_predicted"], average='macro', zero_division=0)
+            recall = recall_score(df_filtered["real_transport_method"], df_filtered["transport_method_predicted"], average='macro', zero_division=0)
+            
+            # Update the last row with precision and recall
+            precision_recall_entry = pd.DataFrame([{
+                "timestamp": "precision_recall",
+                "code": "",
+                "transport_method_predicted": "",
+                "real_transport_method": "",
+                "precision": precision,
+                "recall": recall
+            }])
+            df = pd.concat([df, precision_recall_entry], ignore_index=True)
+        
+        # Save the updated DataFrame to the CSV file
+        df.to_csv(csv_file, index=False)
+
 
     async def notify_users(self, code: str, zone: Optional[str], description: str) -> None:
         """
