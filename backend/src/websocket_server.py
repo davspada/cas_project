@@ -199,7 +199,7 @@ class WebSocketServer:
             self.logger.info("Starting mobile and frontend WebSocket servers...")
 
             # Start both WebSocket servers
-            server_mobile: websockets.WebSocketServerProtocol = await websockets.serve(self.handle_mobile, host, port)
+            server_mobile: websockets.WebSocketServerProtocol = await websockets.serve(self.handle_mobile, host, port, ping_timeout=10)
             server_frontend: websockets.WebSocketServerProtocol = await websockets.serve(self.handle_frontend, host, port + 1)
 
             self.logger.info(f"Mobile WebSocket server listening on ws:{host}:{port}")
