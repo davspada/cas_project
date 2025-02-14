@@ -115,8 +115,13 @@ class KafkaManager:
                         # Find the mobile connection based on user code
                         for mobile in self.connections.get_mobile_code():
                             if mobile == parts[0].split("code: ")[1].strip():
-                                alert_json = json.dumps({"alertText": parts[1].strip()})
-                                
+                                try:
+                                    clean_text = json.loads(parts[1].strip())
+                                except json.JSONDecodeError:
+                                    clean_text = parts[1].strip()
+
+                                alert_json = json.dumps({"alertText": clean_text})                                
+
                                 await self.connections.send_message(
                                     self.connections.get_mobile_connection(mobile), 
                                     alert_json

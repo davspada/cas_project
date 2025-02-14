@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime
 from logging import Logger
 from shapely import wkt
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point, Polygon, mapping, shape
 from shapely.ops import transform
 from shapely.wkt import loads
 from typing import Any, Dict, List, Tuple, Optional
@@ -73,8 +73,9 @@ class AlertManager:
         if isinstance(item, datetime):
             return item.isoformat()
         elif isinstance(item, Polygon):
-            return item.wkt
+            return json.dumps(mapping(item))
         return item
+
 
 
     async def sync_alert_cache(self, alert: Dict[str, Any], isInizialized: bool = True) -> None:
@@ -112,8 +113,11 @@ class AlertManager:
                     self.logger.exception(f"Invalid datetime format in time_end: {alert['time_end']}")
                     raise Exception("Invalid alert format, expected a dictionary.")
 
-                alert_polygon = loads(alert['geofence'])
-                # Find the alert to delete in the cache and notify affected users
+                if alert['geofence'].strip().startswith('{'):
+                    alert_polygon = wkt.loads(wkt.dumps(shape(json.loads(alert['geofence']))))
+                else:
+                    alert_polygon = loads(alert['geofence'])
+                
                 deleted_alert = next(
                     (a for a in self.alert_cache if a['geofence'].equals_exact(alert_polygon, tolerance=1e-9)), 
                     None
@@ -133,7 +137,7 @@ class AlertManager:
                     
                     return {
                         "id": alert['id'],
-                        "geofence": deleted_alert["geofence"].wkt,
+                        "geofence": self.serialize_data(deleted_alert["geofence"]),
                         "time_end": self.serialize_data(alert["time_end"]),
                         "description": deleted_alert["description"]
                     }
@@ -303,8 +307,10 @@ class AlertManager:
         """
         await self.kafka.send_message(
             'users-in-danger',
-            f"code: {code}, message: {self.messages[zone] if zone is not None else ''} {description}"
+            f"code: {code}, message: {self.messages[zone]} {description}."
         )
+
+        self.logger.debug(f"code: {code}, message: {self.messages[zone]} {description}.")
 
     async def start(self) -> None:
         """
