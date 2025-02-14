@@ -159,7 +159,7 @@ class DatabaseManager:
         async with self.pool.acquire() as conn:
             return await conn.fetch(
                 """
-                SELECT id, ST_AsGeoJSON("geofence"), time_start, description 
+                SELECT id, ST_AsGeoJSON("geofence"), time_start, description
                 FROM ALERTS 
                 WHERE time_end IS NULL
                 """
