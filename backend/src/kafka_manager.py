@@ -75,7 +75,7 @@ class KafkaManager:
             self.logger.exception("Failed to manage Kafka services")
             raise
 
-    async def listen(self, alert_manager) -> None:
+    async def listen(self, user_alert_manager) -> None:
         """
         Listen for and process incoming Kafka messages.
         
@@ -88,9 +88,9 @@ class KafkaManager:
         3. user-updates: Sent to all frontend connections
 
         Args:
-        - alert_manager (AlertManager): Instance of AlertManager for alert cache synchronization
+        - user_alert_manager (AlertManager): Instance of AlertManager for alert cache synchronization
         """
-        self.alerts = alert_manager
+        self.user_alert = user_alert_manager
 
         async for message in self.consumer:
             self.logger.info(f"Received message from topic {message.topic}")
@@ -106,7 +106,7 @@ class KafkaManager:
                         for mobile in self.connections.get_mobile_connections():
                             await self.connections.send_message(mobile, message.value)
 
-                        await self.alerts.sync_alert_cache(json.loads(message.value))
+                        await self.user_alert.sync_alert_cache(json.loads(message.value))
 
                     case 'users-in-danger':
                         # Send danger notifications to specific mobile user based on user code

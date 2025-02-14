@@ -7,7 +7,7 @@ import websockets
 from logging import Logger
 from typing import Any, Optional, List, Dict
 
-from alert_manager import AlertManager
+from user_alert_manager import AlertManager
 from config import DB_CONFIG, KAFKA_HOST
 from connection_manager import ConnectionManager
 from database_manager import DatabaseManager
@@ -40,7 +40,7 @@ class WebSocketServer:
         # Initialize Kafka manager for message broadcasting
         self.kafka: KafkaManager = KafkaManager(KAFKA_HOST, self.connections)
         # Initialize alert manager for alert creation and management
-        self.alerts: AlertManager = AlertManager(self.db, self.kafka, self.connections)
+        self.user_alert: AlertManager = AlertManager(self.db, self.kafka, self.connections)
 
     async def handle_mobile(self, websocket: websockets.WebSocketServerProtocol, path: str) -> None:
         """
@@ -85,8 +85,8 @@ class WebSocketServer:
                 await self.connections.send_message(websocket, {"token": new_token})
 
             # Send all the active alerts to the user
-            alerts: List[asyncpg.Record] = await self.db.get_active_alerts()
-            response: List[Any] = [{key: self.alerts.serialize_data(value) for key, value in dict(alert).items()} for alert in alerts]
+            user_alert: List[asyncpg.Record] = await self.db.get_active_alerts()
+            response: List[Any] = [{key: self.user_alert.serialize_data(value) for key, value in dict(alert).items()} for alert in user_alert]
             await self.connections.send_message(websocket, {"alerts": response})
                 
             # Update user's connection status and store WebSocket connection
@@ -100,10 +100,13 @@ class WebSocketServer:
                 # Handle location updates
                 if 'position' in data:
                     await self.db.update_user_location(code, data['position'])
-                    await self.alerts.process_user_update(code, data['position'])
+                    await self.user_alert.user_position_update(code, data['position'])
                 # Handle transport method updates
                 if 'transport_method' in data:
                     await self.db.update_transport_method(code, data['transport_method'])
+
+                    # TODO: ATTENCTION HERE, REMOVE IT IN PRODUCTION ENVIRONMENT
+                    await self.user_alert.user_transport_update(code, data['transport_method'])
 
                 # Broadcast updates to Kafka
                 await self.kafka.send_message('user-updates', data)
@@ -137,17 +140,17 @@ class WebSocketServer:
 
             # Fetch initial state data
             users: List[asyncpg.Record] = await self.db.get_connected_users()
-            alerts: List[asyncpg.Record] = await self.db.get_active_alerts()
+            user_alert: List[asyncpg.Record] = await self.db.get_active_alerts()
 
             # Prepare initial state response
             response: Dict[str, Any] = {
                 "users": [
-                    {key: self.alerts.serialize_data(value) for key, value in dict(row).items()} 
+                    {key: self.user_alert.serialize_data(value) for key, value in dict(row).items()} 
                     for row in users
                 ],
                 "alerts": [
-                    {key: self.alerts.serialize_data(value) for key, value in dict(row).items()} 
-                    for row in alerts
+                    {key: self.user_alert.serialize_data(value) for key, value in dict(row).items()} 
+                    for row in user_alert
                 ],
             }
 
@@ -160,7 +163,7 @@ class WebSocketServer:
             async for message in websocket:
                 self.logger.info(f"Received message from frontend: {message}")
                 if "geofence" in message:
-                    await self.kafka.send_message('alert-updates', await self.alerts.sync_alert_cache(json.loads(message)))
+                    await self.kafka.send_message('alert-updates', await self.user_alert.sync_alert_cache(json.loads(message)))
 
         except Exception as e:
             self.logger.exception("Error handling frontend connection")
@@ -188,10 +191,10 @@ class WebSocketServer:
             # Initialize database and Kafka connections
             await self.db.connect()
             await self.kafka.start()
-            await self.alerts.start()
+            await self.user_alert.start()
 
             # Start listening for incoming messages
-            asyncio.create_task(self.kafka.listen(self.alerts))
+            asyncio.create_task(self.kafka.listen(self.user_alert))
 
             self.logger.info("Starting mobile and frontend WebSocket servers...")
 
