@@ -6,7 +6,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - host: frontend.local
+  - host: cas-sandiego.lab.students.cs.unibo.it
     http:
       paths:
       - path: /
@@ -16,7 +16,7 @@ spec:
             name: frontend-svc
             port:
               number: 3000
-  - host: backend.local
+  - host: cas-sandiego.lab.students.cs.unibo.it
     http:
       paths:
       - path: /ws-frontend
@@ -25,7 +25,7 @@ spec:
           service:
             name: backend-lb
             port:
-              number: 8081
+              number: 30443
       - path: /ws-mobile
         pathType: Prefix
         backend:

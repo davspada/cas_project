@@ -48,7 +48,7 @@ spec:
     app: backend
   ports:
   - name: frontend-api
-    port: 8081
+    port: 30443
     targetPort: 8081
   - name: mobile-api
     port: 8080

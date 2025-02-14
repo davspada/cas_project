@@ -24,11 +24,11 @@ apiVersion: v1
 metadata:
   name: frontend-svc
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: frontend
   ports:
-    - port: 3000
+    - port: 30080
       targetPort: 3000
 # ---
 # apiVersion: v1
