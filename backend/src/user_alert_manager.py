@@ -181,8 +181,9 @@ class AlertManager:
                         if not created_alert:
                             self.logger.exception("Failed to create or retrieve alert from the database.")
                             raise Exception("Failed to create or retrieve alert from the database.")
+                        
+                        return {key: self.serialize_data(value) for key, value in created_alert.items()}
 
-                    return {key: self.serialize_data(value) for key, value in new_alert.items()}
         except ValueError:
             self.logger.exception(f"Invalid datetime format in time_start: {alert['time_start']}")
             raise Exception("Invalid alert format, expected a dictionary.")
