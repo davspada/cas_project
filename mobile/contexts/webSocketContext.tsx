@@ -13,7 +13,7 @@ export const WebSocketProvider = ({ children }) => {
     }
     
     console.log('Connecting to WebSocket...');
-    socket.current = new WebSocket('ws://10.0.2.2:8080')//('ws://10.0.2.2:8080');//ws://cas-sandiego.lab.students.cs.unibo.it:30080/ws-mobile
+    socket.current = new WebSocket('ws://cas-sandiego.lab.students.cs.unibo.it:30080/ws-mobile')//('ws://10.0.2.2:8080');//ws://cas-sandiego.lab.students.cs.unibo.it:30080/ws-mobile
 
     socket.current.onopen = () => {
       console.log('WebSocket connection opened');

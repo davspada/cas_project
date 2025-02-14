@@ -21,7 +21,7 @@ export default function NotificationScreen() {
       Speech.speak(text, {
         language: 'en',
         pitch: 1.0,
-        rate: 1.0, // Adjust rate for slower or faster speech
+        rate: 1.0,
       });
     };
   
@@ -66,7 +66,7 @@ export default function NotificationScreen() {
       if (Array.isArray(message.alerts) && message.alerts.length > 0) {
         const transformedAlerts = message.alerts.map((alert: any) => ({
           type: "Feature",
-          geometry: JSON.parse(alert.st_asgeojson), // Parse GeoJSON geometry
+          geometry: JSON.parse(alert.st_asgeojson),
           properties: {
             id: alert.id,
             time_start: alert.time_start,
@@ -98,7 +98,6 @@ export default function NotificationScreen() {
       //setFilteredMessages((prevMessages) => [...prevMessages, message]);
     };
   
-    // Call handleNewMessage when a new message is received
     if (messages.length > 0) {
       handleNewMessage(messages[messages.length - 1]);
     }
