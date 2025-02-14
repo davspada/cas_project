@@ -74,36 +74,29 @@ export default function LoginScreen() {
   };
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
+    <ParallaxScrollView headerBackgroundColor={{ light: '', dark: '#1D3D47' }}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title">Login</ThemedText>
-        <TextInput
-          style={styles.input}
-          placeholder="Code"
-          value={code}
-          onChangeText={setCode}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Token (if available)"
-          value={token}
-          onChangeText={setToken}
-        />
-        <Button title="Login" onPress={handleLogin} />
+      <ThemedText type="title">Login</ThemedText>
+      <TextInput
+        style={styles.input}
+        placeholder="Code"
+        value={code}
+        onChangeText={setCode}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Token (if available)"
+        value={token}
+        onChangeText={setToken}
+      />
+      <Button title="Login" onPress={handleLogin} />
 
-        {/* <View style={styles.messagesContainer}>
-          <ThemedText type="subtitle">Messages from WebSocket:</ThemedText>
-          {messages.map((msg, index) => (
-          <Text key={index}>{JSON.stringify(msg)}</Text>
-          ))}
-        </View> */}
+      {/* <View style={styles.messagesContainer}>
+        <ThemedText type="subtitle">Messages from WebSocket:</ThemedText>
+        {messages.map((msg, index) => (
+        <Text key={index}>{JSON.stringify(msg)}</Text>
+        ))}
+      </View> */}
       </ThemedView>
     </ParallaxScrollView>
   );

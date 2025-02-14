@@ -8,7 +8,7 @@ export const WebSocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Initialize the WebSocket connection
-    socket.current = new WebSocket('ws://10.0.2.2:8080')//('ws://10.0.2.2:8080');//ws://cas-sandiego.lab.students.cs.unibo.it:30080
+    socket.current = new WebSocket('ws://10.0.2.2:8080')//('ws://10.0.2.2:8080');//ws://cas-sandiego.lab.students.cs.unibo.it:30080/ws-mobile
 
     socket.current.onopen = () => {
       console.log('WebSocket connection opened');
@@ -16,7 +16,7 @@ export const WebSocketProvider = ({ children }) => {
 
     socket.current.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      console.log('Received message:', message);
+      console.log('WS MESSAGE:', message);
       setMessages((prev) => [...prev, message]); // Append to message history
     };
 
