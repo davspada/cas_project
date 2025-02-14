@@ -92,18 +92,17 @@ class AlertManager:
         - Exception: If the alert format is invalid or the datetime
         """
         try:
-            # Determina quale campo di tempo utilizzare
+            # Determine the datetime field to use for alert processing
             if 'time_start' in alert:
                 time_str = alert['time_start'].replace("Z", "+00:00")
             elif 'time_end' in alert:
                 time_str = alert['time_end'].replace("Z", "+00:00")
 
-            # Parse e normalizza la data
+            # Parse and normalize the datetime
             formatted_date: datetime = datetime.fromisoformat(time_str).replace(tzinfo=None)
 
             # Handle alert termination
             if 'time_end' in alert:
-                self.logger.debug("TIME_END")
                 try:
                     # Parse and normalize the datetime
                     formatted_end_time: datetime = datetime.fromisoformat(
@@ -124,7 +123,6 @@ class AlertManager:
                 )
 
                 if deleted_alert is not None:                
-                    self.logger.debug("DELETED_ALERT")
                     # Update database and broadcast the update message
                     await self.db.update_alert(formatted_end_time, alert['id'])
 
@@ -309,8 +307,6 @@ class AlertManager:
             'users-in-danger',
             f"code: {code}, message: {self.messages[zone]} {description}."
         )
-
-        self.logger.debug(f"code: {code}, message: {self.messages[zone]} {description}.")
 
     async def start(self) -> None:
         """
