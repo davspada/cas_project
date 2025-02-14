@@ -132,6 +132,7 @@ class AlertManager:
                             self.user_in_danger.pop((code, geofence))
                     
                     return {
+                        "id": alert['id'],
                         "geofence": deleted_alert["geofence"].wkt,
                         "time_end": self.serialize_data(alert["time_end"]),
                         "description": deleted_alert["description"]
