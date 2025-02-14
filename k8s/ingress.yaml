@@ -33,3 +33,13 @@ spec:
             name: backend-lb
             port:
               number: 8080
+  - host: cas-sandiego.lab.students.cs.unibo.it
+    http:
+      paths:
+      - path: /kafdrop
+        pathType: Prefix
+        backend:
+          service:
+            name: kafdrop-svc
+            port:
+              number: 9000
