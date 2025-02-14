@@ -20,7 +20,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.cas.mobile"
+      "package": "com.cas.mobile",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAj8rEKO2QspfTuKU-MOcp4g4VebVNppCI"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
